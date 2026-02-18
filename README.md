@@ -57,5 +57,14 @@ python voice_calculator.py
 - **SpeechRecognition**: Voice to text.
 - **PyTesseract**: OCR for images.
 
+## Deployment 🚀
+
+### Vercel (Web App)
+This project is configured for Vercel.
+1. Install Vercel CLI: `npm i -g vercel`
+2. Run: `vercel`
+3. Result: Your voice calculator is now online! 
+   *(Note: OCR features may be limited in serverless environments)*
+
 ## License 📄
 MIT License
