@@ -26,69 +26,81 @@ def index():
 
 @app.route('/process_command', methods=['POST'])
 def process_command():
-    data = request.json
-    text = data.get('text', '')
-    
-    response = {
-        'result': None,
-        'speech': "I didn't understand that.",
-        'graph': None,
-        'action': None
-    }
-    
-    # 1. Check Antigravity
-    if math_engine.check_antigravity(text):
-        response['speech'] = "You are now flying!"
-        response['action'] = 'antigravity'
-        return jsonify(response)
+    try:
+        data = request.get_json()
+        text = data.get('text', '')
         
-    # 2. Check Graphing
-    if math_engine.is_graphing_command(text):
-        func_str = math_engine.get_graph_function(text)
-        try:
-            # Generate graph
-            plt.figure(figsize=(6, 4))
-            x = sympy.symbols('x')
-            f = sympy.sympify(func_str)
-            f_lambdified = sympy.lambdify(x, f, modules=['numpy'])
+        if not text:
+            return jsonify({'result': 'No command received'})
             
-            x_vals = np.linspace(-10, 10, 400)
-            y_vals = f_lambdified(x_vals)
-            
-            plt.plot(x_vals, y_vals, color='#00FF00')
-            plt.title(f"y = {func_str}", color='black')
-            plt.grid(True, alpha=0.5)
-            
-            # Save to BytesIO
-            img = io.BytesIO()
-            plt.savefig(img, format='png', bbox_inches='tight')
-            img.seek(0)
-            plot_url = base64.b64encode(img.getvalue()).decode()
-            plt.close()
-            
-            response['graph'] = plot_url
-            response['speech'] = f"Graphing {func_str}"
-            response['result'] = f"Graph of {func_str}"
-        except Exception as e:
-            response['speech'] = "I could not plot that function."
-            response['result'] = f"Graph Error: {str(e)}"
-            
-        return jsonify(response)
+        response = {
+            'speech': '',
+            'result': '',
+            'graph': None,
+            'action': None
+        }
         
-    # 3. Check Calculus (Differentiation/Integration)
-    calculus_result = math_engine.check_calculus(text)
-    if calculus_result:
-        response['result'] = calculus_result
-        response['speech'] = calculus_result
-        return jsonify(response)
+        # 1. Check for Antigravity
+        if math_engine.check_antigravity(text):
+            response['action'] = 'antigravity'
+            response['speech'] = 'Activating anti gravity mode'
+            response['result'] = 'Antigravity Activated 🚀'
+            return jsonify(response)
 
-    # 4. Evaluate Math
-    result = math_engine.evaluate(text)
-    if result:
-        response['result'] = result
-        response['speech'] = f"The result is {result}"
-    
-    return jsonify(response)
+        # 2. Check for Graphing
+        if math_engine.is_graphing_command(text):
+            func_str = math_engine.get_graph_function(text)
+            try:
+                # Generate graph
+                plt.figure(figsize=(6, 4))
+                x = sympy.symbols('x')
+                f = sympy.sympify(func_str)
+                f_lambdified = sympy.lambdify(x, f, modules=['numpy'])
+                
+                x_vals = np.linspace(-10, 10, 400)
+                y_vals = f_lambdified(x_vals)
+                
+                plt.plot(x_vals, y_vals, color='#00FF00')
+                plt.title(f"y = {func_str}", color='black')
+                plt.grid(True, alpha=0.5)
+                
+                # Save to BytesIO
+                img = io.BytesIO()
+                plt.savefig(img, format='png', bbox_inches='tight')
+                img.seek(0)
+                plot_url = base64.b64encode(img.getvalue()).decode()
+                plt.close()
+                
+                response['graph'] = plot_url
+                response['speech'] = f"Graphing {func_str}"
+                response['result'] = f"Graph of {func_str}"
+            except Exception as e:
+                response['speech'] = "I could not plot that function."
+                response['result'] = f"Graph Error: {str(e)}"
+                
+            return jsonify(response)
+            
+        # 3. Check Calculus (Differentiation/Integration)
+        calculus_result = math_engine.check_calculus(text)
+        if calculus_result:
+            response['result'] = calculus_result
+            response['speech'] = calculus_result
+            return jsonify(response)
+
+        # 4. Evaluate Math
+        result = math_engine.evaluate(text)
+        if result:
+            response['result'] = result
+            response['speech'] = f"The answer is {result}"
+        else:
+            response['speech'] = "I didn't understand that."
+            response['result'] = None
+            
+        return jsonify(response)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'result': f"Server Error: {str(e)}", 'speech': "An internal error occurred."}), 500
 
 @app.route('/upload_image', methods=['POST'])
 def upload_image():
