@@ -66,5 +66,16 @@ This project is configured for Vercel.
 3. Result: Your voice calculator is now online! 
    *(Note: OCR features may be limited in serverless environments)*
 
+### Render (Alternative)
+1. Push your code to GitHub.
+2. Go to [render.com](https://render.com) and log in.
+3. Click **New +** -> **Web Service**.
+4. Connect your GitHub repository.
+5. Use these settings:
+   - **Runtime**: Python 3
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `gunicorn app:app`
+6. Click **Create Web Service**.
+
 ## License 📄
 MIT License
