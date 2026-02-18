@@ -1,7 +1,12 @@
 
 import sympy
 from sympy.parsing.sympy_parser import parse_expr, standard_transformations, implicit_multiplication_application
-import pytesseract
+import sympy
+from sympy.parsing.sympy_parser import parse_expr, standard_transformations, implicit_multiplication_application
+try:
+    import pytesseract
+except ImportError:
+    pytesseract = None
 from PIL import Image
 
 class MathEngine:
@@ -183,9 +188,15 @@ class MathEngine:
 
 class ImageHandler:
     def extract_text(self, image_path):
+        if pytesseract is None:
+            return "OCR Library not installed on server."
         try:
             img = Image.open(image_path)
-            text = pytesseract.image_to_string(img)
-            return text.strip()
+            # Check if tesseract binary is available
+            try:
+                text = pytesseract.image_to_string(img)
+                return text.strip()
+            except Exception:
+                 return "Tesseract Binary not found on server."
         except Exception as e:
             return str(e)

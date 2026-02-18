@@ -2,6 +2,8 @@
 from flask import Flask, render_template, request, jsonify
 from calculator_logic import MathEngine, ImageHandler
 import os
+# Fix for Matplotlib on serverless (Vercel/Render) - must be writable
+os.environ['MPLCONFIGDIR'] = '/tmp'
 import base64
 import io
 import matplotlib
