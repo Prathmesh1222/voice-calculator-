@@ -1,0 +1,8 @@
+Flask
+numpy
+matplotlib
+sympy
+Pillow
+pytesseract
+gunicorn
+# speech_recognition, pyaudio, pyttsx3 are Desktop only and removed to prevent Vercel build errors
