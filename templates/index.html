@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Next-Gen Voice Calculator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-wave-square"></i> Voice Calculator</h1>
+            <p>Speak naturally, calculate instantly.</p>
+        </header>
+
+        <main>
+            <!-- Display Area -->
+            <div class="display-area" id="displayHelper">
+                <div class="chat-bubble user-bubble" id="userText">Ready...</div>
+                <div class="chat-bubble bot-bubble" id="botText">Click the microphone to start.</div>
+            </div>
+
+            <!-- Graph Container -->
+            <div class="graph-container" id="graphContainer">
+                <!-- Graph image will be injected here -->
+            </div>
+
+            <!-- Controls -->
+            <div class="controls">
+                <button id="micBtn" class="mic-button">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                
+                <div class="upload-section">
+                    <input type="file" id="imageInput" accept="image/*" hidden>
+                    <button id="uploadBtn" class="action-button">
+                        <i class="fas fa-camera"></i> Upload Image
+                    </button>
+                </div>
+            </div>
+            
+            <div class="status-bar" id="statusBar">System Ready</div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
