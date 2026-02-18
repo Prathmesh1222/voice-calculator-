@@ -1,31 +1,53 @@
-
 from flask import Flask, render_template, request, jsonify
-from calculator_logic import MathEngine, ImageHandler
-import os
-# Fix for Matplotlib on serverless (Vercel/Render) - must be writable
-os.environ['MPLCONFIGDIR'] = '/tmp'
-import base64
-import io
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import sympy
-import numpy as np
+import sys
+import traceback
 
 app = Flask(__name__)
-math_engine = MathEngine()
-image_handler = ImageHandler()
 
-# Ensure we have a static folder
-if not os.path.exists('static'):
-    os.makedirs('static')
+# Global Error State
+GLOBAL_ERROR = None
+math_engine = None
+image_handler = None
+
+try:
+    # 1. Setup Environment
+    import os
+    os.environ['MPLCONFIGDIR'] = '/tmp'
+    
+    # 2. Imports
+    import base64
+    import io
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import sympy
+    import numpy as np
+    
+    # 3. Logic Modules
+    from calculator_logic import MathEngine, ImageHandler
+    
+    # 4. Initialize
+    math_engine = MathEngine()
+    image_handler = ImageHandler()
+
+    # Ensure we have a static folder
+    if not os.path.exists('static'):
+        os.makedirs('static')
+    
+except Exception as e:
+    GLOBAL_ERROR = f"Server Startup Error:\n{str(e)}\n\n{traceback.format_exc()}"
 
 @app.route('/')
 def index():
+    if GLOBAL_ERROR:
+        return f"<html><body><h1>Deployment Error</h1><pre>{GLOBAL_ERROR}</pre></body></html>", 500
     return render_template('index.html')
 
 @app.route('/process_command', methods=['POST'])
 def process_command():
+    if GLOBAL_ERROR:
+        return jsonify({'result': "Server Startup Error. Check Homepage.", 'speech': "Critical server error."})
+        
     try:
         data = request.get_json()
         text = data.get('text', '')
