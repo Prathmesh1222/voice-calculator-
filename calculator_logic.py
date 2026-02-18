@@ -114,9 +114,10 @@ class MathEngine:
         text = text.lower()
         
         # 1. Differentiation
-        if any(w in text for w in ['differentiate', 'derivative', 'derive']):
-            # Cleanup
-            for w in ['differentiate', 'derivative of', 'derivative', 'derive', 'with respect to x']:
+        if any(w in text for w in ['differentiate', 'derivative', 'derive', 'differentiation']):
+            # Cleanup - Sort by length descending to match longest phrases first
+            cleanup_phrases = ['differentiation of', 'derivative of', 'differentiate', 'derivative', 'derive', 'differentiation', 'with respect to x']
+            for w in cleanup_phrases:
                 text = text.replace(w, '')
             
             # NLP replacements (shared with evaluate)
@@ -140,7 +141,8 @@ class MathEngine:
         # 2. Integration
         if any(w in text for w in ['integrate', 'integral', 'integration']):
             # Cleanup
-            for w in ['integrate', 'integral of', 'integral', 'integration', 'with respect to x']:
+            cleanup_phrases = ['integration of', 'integral of', 'integrate', 'integral', 'integration', 'with respect to x']
+            for w in cleanup_phrases:
                 text = text.replace(w, '')
             
             # NLP replacements
