@@ -99,7 +99,7 @@ def process_command():
             try:
                 plt.figure(figsize=(6, 4))
                 x = sympy.symbols('x')
-                f = sympy.sympify(func_str)
+                f = math_engine._parse_safe(func_str)
                 f_lambdified = sympy.lambdify(x, f, modules=['numpy'])
 
                 x_vals = np.linspace(-10, 10, 400)

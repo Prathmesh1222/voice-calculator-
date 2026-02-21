@@ -377,6 +377,10 @@ class MathEngine:
         text = text.replace('squared', '**2').replace('cubed', '**3')
         text = text.replace('square', '**2').replace('cube', '**3')
         text = text.replace('sqaure', '**2')
+        text = text.replace('logarithm', 'log')
+        text = text.replace('e power x', 'exp(x)').replace('e power', 'exp')
+        text = text.replace('exponential', 'exp')
+        text = text.replace('power', '**').replace('raised to', '**')
         text = text.replace('^', '**')
         return text.strip()
 
