@@ -9,35 +9,65 @@ const uploadBtn = document.getElementById('uploadBtn');
 
 // Web Speech API Setup
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-const recognition = new SpeechRecognition();
-recognition.lang = 'en-US';
-recognition.interimResults = false;
-recognition.maxAlternatives = 1;
+let recognition;
+try {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+} catch (e) {
+    console.warn('SpeechRecognition not supported');
+}
 
 let isListening = false;
 
-// TTS Setup
+// --- TTS Setup (Optimized for speed) ---
 const synth = window.speechSynthesis;
+let preferredVoice = null;
 
-function speak(text) {
-    if (synth.speaking) {
-        console.error('speechSynthesis.speaking');
-        return;
-    }
-    if (text !== '') {
-        const utterThis = new SpeechSynthesisUtterance(text);
-        utterThis.onend = function (event) {
-            console.log('SpeechSynthesisUtterance.onend');
-        }
-        utterThis.onerror = function (event) {
-            console.error('SpeechSynthesisUtterance.onerror');
-        }
-        synth.speak(utterThis);
+// Pre-load voices immediately + on change
+function loadVoices() {
+    const voices = synth.getVoices();
+    if (voices.length > 0) {
+        // Prefer a local English voice (faster than network voices)
+        preferredVoice = voices.find(v => v.lang.startsWith('en') && v.localService) ||
+                         voices.find(v => v.lang.startsWith('en')) ||
+                         voices[0];
     }
 }
+loadVoices();
+if (synth.onvoiceschanged !== undefined) {
+    synth.onvoiceschanged = loadVoices;
+}
 
-// Microphone Interaction
+function speak(text) {
+    if (!text || text === '') return;
+
+    // Cancel any ongoing speech immediately so new result speaks fast
+    synth.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.1;   // Slightly faster
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    if (preferredVoice) {
+        utterance.voice = preferredVoice;
+    }
+
+    utterance.onerror = (e) => console.error('TTS error:', e);
+
+    // Chrome bug workaround: resume synth if paused
+    synth.resume();
+    synth.speak(utterance);
+}
+
+// --- Microphone Interaction ---
 micBtn.addEventListener('click', () => {
+    if (!recognition) {
+        addBotMessage("Speech recognition not supported in this browser.");
+        return;
+    }
     if (!isListening) {
         try {
             recognition.start();
@@ -49,25 +79,37 @@ micBtn.addEventListener('click', () => {
     }
 });
 
-recognition.onstart = () => {
-    isListening = true;
-    micBtn.classList.add('listening');
-    statusBar.textContent = "Listening...";
-};
+if (recognition) {
+    recognition.onstart = () => {
+        isListening = true;
+        micBtn.classList.add('listening');
+        statusBar.textContent = "Listening...";
+    };
 
-recognition.onend = () => {
-    isListening = false;
-    micBtn.classList.remove('listening');
-    statusBar.textContent = "Processing...";
-};
+    recognition.onend = () => {
+        isListening = false;
+        micBtn.classList.remove('listening');
+        statusBar.textContent = "Processing...";
+    };
 
-recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript;
-    addUserMessage(transcript);
-    sendToBackend(transcript);
-};
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        addUserMessage(transcript);
+        sendToBackend(transcript);
+    };
 
-// Image Upload
+    recognition.onerror = (event) => {
+        isListening = false;
+        micBtn.classList.remove('listening');
+        if (event.error === 'no-speech') {
+            statusBar.textContent = "No speech detected. Try again.";
+        } else {
+            statusBar.textContent = "Mic error: " + event.error;
+        }
+    };
+}
+
+// --- Image Upload ---
 uploadBtn.addEventListener('click', () => {
     imageInput.click();
 });
@@ -79,21 +121,18 @@ imageInput.addEventListener('change', (e) => {
 });
 
 
-// Backend Communication
+// --- Backend Communication ---
 async function sendToBackend(text) {
     statusBar.textContent = "Calculating...";
 
     try {
         const response = await fetch('/process_command', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: text })
         });
 
         const data = await response.json();
-
         handleResponse(data);
 
     } catch (error) {
@@ -116,7 +155,6 @@ async function uploadImage(file) {
         });
 
         const data = await response.json();
-
 
         if (data.error) {
             addBotMessage("Error: " + data.error);
@@ -141,6 +179,7 @@ async function uploadImage(file) {
 }
 
 
+// --- Response Handler ---
 function handleResponse(data) {
     // 1. Antigravity
     if (data.action === 'antigravity') {
@@ -155,7 +194,7 @@ function handleResponse(data) {
     if (data.graph) {
         const img = document.createElement('img');
         img.src = "data:image/png;base64," + data.graph;
-        graphContainer.innerHTML = ''; // Clear previous
+        graphContainer.innerHTML = '';
         graphContainer.appendChild(img);
         addBotMessage(data.result);
         speak(data.speech);
@@ -167,21 +206,18 @@ function handleResponse(data) {
     if (data.result) {
         addBotMessage(data.result);
         speak(data.speech);
-        statusBar.textContent = "Ready";
     } else {
-        addBotMessage(data.speech);
+        addBotMessage(data.speech || "I didn't understand that.");
         speak(data.speech);
-        statusBar.textContent = "Ready";
     }
+    statusBar.textContent = "Ready";
 }
 
 
 function addUserMessage(text) {
     userText.textContent = text;
-    // userText.scrollIntoView({ behavior: "smooth" });
 }
 
 function addBotMessage(text) {
     botText.textContent = text;
-    // botText.scrollIntoView({ behavior: "smooth" });
 }
