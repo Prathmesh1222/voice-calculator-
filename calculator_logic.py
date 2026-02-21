@@ -35,6 +35,16 @@ class MathEngine:
         result = result.replace('sqrt', '√')
         return result
 
+    def pretty_func_name(self, func_str):
+        """Clean up a function string for display in graph titles."""
+        pretty = func_str.strip()
+        # Collapse spaces before ** so 'x **2' becomes 'x**2'
+        pretty = re.sub(r'\s*\*\*\s*', '**', pretty)
+        pretty = pretty.replace('**2', '²').replace('**3', '³')
+        pretty = pretty.replace('**', '^')
+        pretty = pretty.replace('*', '·')
+        return pretty
+
     def _clean_calculus_input(self, text):
         """Shared NLP cleanup for calculus inputs."""
         # Remove all known trigger/filler words
@@ -117,15 +127,25 @@ class MathEngine:
 
         expression = expression.strip()
 
+        # Division by zero check
+        if re.search(r'/\s*0(\.0*)?\s*$', expression) or re.search(r'/\s*0(\.0*)?\s*[^.]', expression):
+            return "Error: Cannot divide by zero"
+
         try:
             if expression.count('(') > expression.count(')'):
                 expression += ')' * (expression.count('(') - expression.count(')'))
 
             result = self._parse_safe(expression).evalf()
             val = float(result)
+            if val == float('inf') or val == float('-inf'):
+                return "Error: Cannot divide by zero"
+            if val != val:  # NaN check
+                return "Error: Undefined result"
             if val.is_integer():
                 return str(int(val))
             return str(round(val, 4))
+        except ZeroDivisionError:
+            return "Error: Cannot divide by zero"
         except Exception:
             try:
                 if any(w in expression.split() for w in ['and', 'or', 'not', 'is']):

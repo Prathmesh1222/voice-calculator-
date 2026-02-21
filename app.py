@@ -82,8 +82,11 @@ def process_command():
                 x_vals = np.linspace(-10, 10, 400)
                 y_vals = f_lambdified(x_vals)
                 
+                # Pretty title: x**2 -> x²
+                pretty_func = math_engine.pretty_func_name(func_str)
+                
                 plt.plot(x_vals, y_vals, color='#00FF00')
-                plt.title(f"y = {func_str}", color='black')
+                plt.title(f"y = {pretty_func}", color='black')
                 plt.grid(True, alpha=0.5)
                 
                 # Save to BytesIO
@@ -94,8 +97,8 @@ def process_command():
                 plt.close()
                 
                 response['graph'] = plot_url
-                response['speech'] = f"Graphing {func_str}"
-                response['result'] = f"Graph of {func_str}"
+                response['speech'] = f"Graphing {pretty_func}"
+                response['result'] = f"Graph of {pretty_func}"
             except Exception as e:
                 response['speech'] = "I could not plot that function."
                 response['result'] = f"Graph Error: {str(e)}"
