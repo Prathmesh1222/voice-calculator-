@@ -1,81 +1,113 @@
-# Next-Gen Voice Calculator 🎙️➕
+# 🎙️ Voice Calculator
 
-A powerful AI-driven calculator that supports voice commands, natural language processing, graphing, and calculus operations. Built with Python (Flask & Tkinter).
+A next-generation voice-powered calculator that understands natural language. Speak or type commands to perform arithmetic, calculus, graphing, unit conversions, equation solving, and matrix operations.
 
-## Features 🚀
+> **Project Exhibition — 2**  
+> B.Tech CSE • 2025-26
 
-- **Voice Control**: Speak natural commands like "Calculate 5 plus 5" or "Plot x squared".
-- **Advanced Math**: Supports basic arithmetic, power, roots, logarithms (`log`, `ln`), and exponential functions.
-- **Calculus**: Perform differentiation and integration (e.g., "Differentiate x squared", "Integrate 2x").
-- **Graphing**: Visualizes mathematical functions instantly.
-- **Image Upload**: Upload images of math problems for OCR-based solving.
-- **Dual Interface**: 
-    - **Web App**: Modern, responsive UI with dark mode and glassmorphism.
-    - **Desktop App**: Classic Tkinter-based GUI for offline use.
+## 👥 Team
 
-## Installation 🛠️
+| Name              | Roll No.   |
+| ----------------- | ---------- |
+| Prathmesh Jadhav  | 24BCE10076 |
+| Gayatri Kurkute   | 24BCE10094 |
+| Abhijeet Patil    | 24BCE10110 |
+| Shreya Mandaogade | 24BCE10614 |
+| Prathviraj Chavan | 24BCE10116 |
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/your-username/voice-calculator.git
-   cd voice-calculator
-   ```
+## ✨ Features
 
-2. Create a virtual environment (optional but recommended):
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
+| Category               | Examples                                                         |
+| ---------------------- | ---------------------------------------------------------------- |
+| **Voice & Text Input** | Speak or type commands naturally                                 |
+| **Arithmetic**         | "5 plus 3", "product of 4 and 5", "square root of 16"            |
+| **Calculus**           | "differentiate x squared", "integrate 2x", "derivative of sin x" |
+| **Graphing**           | "plot sin x", "graph x squared", "plot log x", "plot e power x"  |
+| **Equation Solving**   | "solve x squared minus 4 equals 0" → x = -2, 2                   |
+| **Unit Conversion**    | "convert 100 celsius to fahrenheit", "convert 5 km to miles"     |
+| **Matrix Operations**  | "determinant of \[\[1,2\],\[3,4\]\]", inverse, transpose         |
+| **Image OCR**          | Upload a photo of a math problem                                 |
+| **Division by Zero**   | Graceful error handling                                          |
 
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-   *(Note: You may need to install system dependencies for PyAudio and Tkinter based on your OS)*
+## 🛠️ Tech Stack
 
-## Usage ▶️
+- **Backend:** Python, Flask, SymPy, Matplotlib, NumPy
+- **Frontend:** HTML5, CSS3, JavaScript (ES6+)
+- **APIs:** Web Speech API, SpeechSynthesis API
+- **OCR:** Tesseract (pytesseract)
+- **Deployment:** Vercel / Render
+- **PWA:** Installable on mobile devices
 
-### Web Application (Recommended)
-Run the helper script:
+## 🚀 Live Demo
+
+**[voice-calculator-one.vercel.app](https://voice-calculator-one.vercel.app)**
+
+## 📦 Installation (Local)
+
 ```bash
-./run_web.sh
-```
-The app will automatically open in your browser at `http://127.0.0.1:5000`.
+# Clone
+git clone https://github.com/Prathmesh1222/voice-calculator-.git
+cd voice-calculator-
 
-### Desktop Application
-Run the desktop GUI:
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate   # Linux/Mac
+# .venv\Scripts\activate    # Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run
+python app.py
+```
+
+The app will open at **http://127.0.0.1:5000** automatically.
+
+## 📁 Project Structure
+
+```
+voice-calculator/
+├── app.py                  # Flask backend (routes, graphing, API)
+├── calculator_logic.py     # Math engine (NLP, calculus, equations, conversions)
+├── voice_calculator.py     # Desktop GUI (Tkinter)
+├── test_engine.py          # Test suite (30 tests)
+├── requirements.txt        # Python dependencies
+├── vercel.json             # Vercel deployment config
+├── templates/
+│   ├── index.html          # Main web UI
+│   └── about.html          # About / Team page
+├── static/
+│   ├── style.css           # Light theme + responsive CSS
+│   ├── script.js           # Frontend logic (voice, chat, export)
+│   ├── manifest.json       # PWA manifest
+│   └── sw.js               # Service worker
+└── run_web.sh              # Launch script
+```
+
+## 🧪 Running Tests
+
 ```bash
-python voice_calculator.py
+python test_engine.py
 ```
 
-## Technologies Used 💻
-- **Python**: Core logic.
-- **Flask**: Web backend.
-- **Tkinter**: Desktop GUI.
-- **SymPy**: Symbolic mathematics (Calculus, Algebra).
-- **Matplotlib**: Graph plotting.
-- **SpeechRecognition**: Voice to text.
-- **PyTesseract**: OCR for images.
+Tests cover: arithmetic, calculus, unit conversions, equation solving, matrix operations, division by zero, and rate limiting.
 
-## Deployment 🚀
+## 🌐 Deployment
 
-### Vercel (Web App)
-This project is configured for Vercel.
-1. Install Vercel CLI: `npm i -g vercel`
-2. Run: `vercel`
-3. Result: Your voice calculator is now online! 
-   *(Note: OCR features may be limited in serverless environments)*
+### Vercel
 
-### Render (Alternative)
-1. Push your code to GitHub.
-2. Go to [render.com](https://render.com) and log in.
-3. Click **New +** -> **Web Service**.
-4. Connect your GitHub repository.
-5. Use these settings:
-   - **Runtime**: Python 3
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn app:app`
-6. Click **Create Web Service**.
+1. Push to GitHub
+2. Import repo on [vercel.com](https://vercel.com)
+3. Framework: **Other**, Root: `./`
+4. Auto-deploys on every push
 
-## License 📄
+### Render
+
+1. Push to GitHub
+2. New Web Service on [render.com](https://render.com)
+3. Build: `pip install -r requirements.txt`
+4. Start: `gunicorn app:app`
+
+## 📄 License
+
 MIT License
