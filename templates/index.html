@@ -2,48 +2,90 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Next-Gen Voice Calculator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Voice Calculator — Speak & Solve</title>
+    <meta name="description" content="A next-gen voice-powered calculator that solves math, plots graphs, and does calculus using natural language.">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#6366f1">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1><i class="fas fa-wave-square"></i> Voice Calculator</h1>
+            <h1><i class="fas fa-calculator"></i> Voice Calculator</h1>
             <p>Speak naturally, calculate instantly.</p>
+            <nav class="header-nav">
+                <a href="/about" class="nav-link"><i class="fas fa-info-circle"></i> About</a>
+            </nav>
         </header>
 
         <main>
-            <!-- Display Area -->
-            <div class="display-area" id="displayHelper">
-                <div class="chat-bubble user-bubble" id="userText">Ready...</div>
-                <div class="chat-bubble bot-bubble" id="botText">Click the microphone to start.</div>
+            <!-- Example Commands -->
+            <div class="examples-panel" id="examplesPanel">
+                <p class="examples-title"><i class="fas fa-lightbulb"></i> Try these:</p>
+                <div class="examples-grid">
+                    <button class="example-chip" data-cmd="5 plus 3">5 plus 3</button>
+                    <button class="example-chip" data-cmd="differentiate x squared">differentiate x²</button>
+                    <button class="example-chip" data-cmd="plot sin x">plot sin x</button>
+                    <button class="example-chip" data-cmd="solve x squared minus 4 equals 0">solve x²−4 = 0</button>
+                    <button class="example-chip" data-cmd="convert 100 celsius to fahrenheit">100°C to °F</button>
+                    <button class="example-chip" data-cmd="integrate 2x">integrate 2x</button>
+                    <button class="example-chip" data-cmd="square root of 144">√144</button>
+                    <button class="example-chip" data-cmd="determinant of [[1,2],[3,4]]">det [[1,2],[3,4]]</button>
+                </div>
+            </div>
+
+            <!-- Chat Display -->
+            <div class="chat-area" id="chatArea">
+                <div class="chat-welcome">
+                    <i class="fas fa-robot"></i>
+                    <p>Hi! I'm your voice calculator. Ask me anything!</p>
+                </div>
             </div>
 
             <!-- Graph Container -->
             <div class="graph-container" id="graphContainer">
-                <!-- Graph image will be injected here -->
+                <!-- Graph will appear here -->
+            </div>
+
+            <!-- Loading Spinner -->
+            <div class="loader-wrapper" id="loader" style="display:none;">
+                <div class="spinner"></div>
+                <span>Calculating...</span>
             </div>
 
             <!-- Controls -->
             <div class="controls">
-                <button id="micBtn" class="mic-button">
-                    <i class="fas fa-microphone"></i>
-                </button>
-                
-                <div class="upload-section">
-                    <input type="file" id="imageInput" accept="image/*" hidden>
-                    <button id="uploadBtn" class="action-button">
-                        <i class="fas fa-camera"></i> Upload Image
+                <div class="text-input-wrapper">
+                    <input type="text" id="textInput" placeholder="Type a command..." autocomplete="off">
+                    <button id="sendBtn" class="send-button" title="Send"><i class="fas fa-paper-plane"></i></button>
+                </div>
+                <div class="action-buttons">
+                    <button id="micBtn" class="mic-button" title="Speak">
+                        <i class="fas fa-microphone"></i>
                     </button>
+                    <div class="secondary-actions">
+                        <input type="file" id="imageInput" accept="image/*" hidden>
+                        <button id="uploadBtn" class="action-btn" title="Upload Image">
+                            <i class="fas fa-camera"></i>
+                        </button>
+                        <button id="exportBtn" class="action-btn" title="Export History">
+                            <i class="fas fa-download"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
-            
-            <div class="status-bar" id="statusBar">System Ready</div>
+
+            <div class="status-bar" id="statusBar">Ready</div>
         </main>
     </div>
+
+    <!-- Sound Effect -->
+    <audio id="dingSound" preload="auto">
+        <source src="https://cdn.freesound.org/previews/536/536420_4921277-lq.mp3" type="audio/mpeg">
+    </audio>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
