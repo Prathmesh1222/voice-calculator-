@@ -9,7 +9,7 @@ const textInput = document.getElementById('textInput');
 const sendBtn = document.getElementById('sendBtn');
 const loader = document.getElementById('loader');
 const exportBtn = document.getElementById('exportBtn');
-const dingSound = document.getElementById('dingSound');
+
 
 // ===== Chat History =====
 let chatHistory = [];
@@ -109,13 +109,7 @@ function speak(text) {
     synth.speak(utterance);
 }
 
-function playDing() {
-    if (dingSound) {
-        dingSound.currentTime = 0;
-        dingSound.volume = 0.3;
-        dingSound.play().catch(() => {});
-    }
-}
+
 
 // ===== Microphone =====
 micBtn.addEventListener('click', () => {
@@ -246,7 +240,6 @@ async function sendToBackend(text) {
 
         const data = await response.json();
         hideLoader();
-        playDing();
         handleResponse(data);
 
     } catch (error) {
