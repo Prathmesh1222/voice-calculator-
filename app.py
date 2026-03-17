@@ -87,19 +87,26 @@ def process_single_command(text):
     # 5. Graphing (2D and 3D)
     if math_engine.is_graphing_command(text):
         is_3d = '3d' in text.lower()
-        clean_text = text.lower().replace('3d', '').strip()
-        func_str = math_engine.get_graph_function(clean_text)
+        func_str = math_engine.get_graph_function(text)
+
+        # Auto-detect 3D if 'y' is in the expression
+        if 'y' in func_str and not is_3d:
+            is_3d = True
 
         try:
+            x_sym, y_sym = sympy.symbols('x y')
+            local_dict = {'x': x_sym, 'y': y_sym,
+                          'sin': sympy.sin, 'cos': sympy.cos, 'tan': sympy.tan,
+                          'log': sympy.log, 'exp': sympy.exp, 'sqrt': sympy.sqrt,
+                          'abs': sympy.Abs}
+
+            f = sympy.sympify(func_str, locals=local_dict)
+
             if is_3d:
                 # 3D Surface Plot
                 fig = plt.figure(figsize=(7, 5))
                 ax = fig.add_subplot(111, projection='3d')
 
-                x_sym, y_sym = sympy.symbols('x y')
-                f = math_engine._parse_safe(func_str.replace(' ', ''))
-                if f is None:
-                    f = sympy.sympify(func_str)
                 f_lambdified = sympy.lambdify((x_sym, y_sym), f, modules=['numpy'])
 
                 x_vals = np.linspace(-5, 5, 50)
@@ -116,9 +123,7 @@ def process_single_command(text):
             else:
                 # 2D Plot
                 plt.figure(figsize=(6, 4))
-                x = sympy.symbols('x')
-                f = math_engine._parse_safe(func_str)
-                f_lambdified = sympy.lambdify(x, f, modules=['numpy'])
+                f_lambdified = sympy.lambdify(x_sym, f, modules=['numpy'])
 
                 x_vals = np.linspace(-10, 10, 400)
                 y_vals = f_lambdified(x_vals)

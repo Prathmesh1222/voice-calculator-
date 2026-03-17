@@ -397,13 +397,23 @@ class MathEngine:
         return text.lower().startswith(('plot', 'graph', 'draw'))
 
     def get_graph_function(self, text):
-        for word in ['plot', 'graph', 'draw']:
-            text = text.lower().replace(word, '')
+        text = text.lower()
+        for word in ['plot', 'graph', 'draw', '3d']:
+            text = text.replace(word, '')
 
+        # Trig
         text = text.replace('sine', 'sin').replace('cosine', 'cos').replace('tangent', 'tan')
+        # Powers
+        text = text.replace('x squared', 'x**2').replace('y squared', 'y**2')
+        text = text.replace('x cubed', 'x**3').replace('y cubed', 'y**3')
         text = text.replace('squared', '**2').replace('cubed', '**3')
         text = text.replace('square', '**2').replace('cube', '**3')
         text = text.replace('sqaure', '**2')
+        # Operators
+        text = text.replace('plus', '+').replace('minus', '-')
+        text = text.replace('times', '*').replace('multiplied by', '*')
+        text = text.replace('divided by', '/').replace('over', '/')
+        # Functions
         text = text.replace('logarithm', 'log')
         text = text.replace('e power x', 'exp(x)').replace('e power', 'exp')
         text = text.replace('exponential', 'exp')
