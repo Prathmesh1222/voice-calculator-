@@ -235,14 +235,72 @@ sendBtn.addEventListener('click', () => {
     }
 });
 
-// ===== Example Commands =====
-document.querySelectorAll('.example-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-        const cmd = chip.getAttribute('data-cmd');
-        addMessage(cmd, 'user');
-        sendToBackend(cmd);
+// ===== Example Commands (Language-Specific) =====
+const examplesGrid = document.getElementById('examplesGrid');
+
+const examplesByLang = {
+    'en-US': [
+        { cmd: '5 plus 3', label: '5 plus 3' },
+        { cmd: 'differentiate x squared', label: 'differentiate x²' },
+        { cmd: 'plot sin x', label: 'plot sin x' },
+        { cmd: 'solve x squared minus 4 equals 0', label: 'solve x²−4 = 0' },
+        { cmd: 'convert 100 celsius to fahrenheit', label: '100°C to °F' },
+        { cmd: 'integrate 2x', label: 'integrate 2x' },
+        { cmd: 'plot 3d x squared plus y squared', label: '3D plot x²+y²' },
+        { cmd: '5 times 5 then plot x squared', label: '5×5 then plot x²' },
+    ],
+    'hi-IN': [
+        { cmd: 'पांच जमा तीन', label: 'पांच जमा तीन' },
+        { cmd: 'दस गुना चार', label: 'दस गुना चार' },
+        { cmd: 'बीस भाग पांच', label: 'बीस भाग पांच' },
+        { cmd: 'सोलह का वर्गमूल', label: '√16 वर्गमूल' },
+        { cmd: 'सौ सेल्सियस को फारेनहाइट में बदलो', label: '100°C → °F' },
+        { cmd: 'एक सौ गुना दो', label: '100 × 2' },
+        { cmd: 'तीन जमा सात', label: 'तीन जमा सात' },
+        { cmd: 'नौ घटा चार', label: 'नौ घटा चार' },
+    ],
+    'mr-IN': [
+        { cmd: 'पाच अधिक तीन', label: 'पाच अधिक तीन' },
+        { cmd: 'दहा गुणिले चार', label: 'दहा गुणिले चार' },
+        { cmd: 'वीस भागिले पाच', label: 'वीस भागिले पाच' },
+        { cmd: 'सोळाचे वर्गमूळ', label: '√16 वर्गमूळ' },
+        { cmd: 'शंभर सेल्सिअस फॅरेनहाइट मध्ये', label: '100°C → °F' },
+        { cmd: 'शंभर गुणिले दोन', label: '100 × 2' },
+        { cmd: 'तीन अधिक सात', label: 'तीन अधिक सात' },
+        { cmd: 'नऊ वजा चार', label: 'नऊ वजा चार' },
+    ],
+    'es-ES': [
+        { cmd: 'cinco más tres', label: 'cinco más tres' },
+        { cmd: 'diez por cuatro', label: 'diez por cuatro' },
+        { cmd: 'veinte dividido cinco', label: 'veinte ÷ cinco' },
+        { cmd: 'raíz cuadrada de dieciséis', label: '√16' },
+        { cmd: 'convertir 100 celsius a fahrenheit', label: '100°C → °F' },
+        { cmd: 'cien por dos', label: '100 × 2' },
+        { cmd: 'tres más siete', label: 'tres más siete' },
+        { cmd: 'nueve menos cuatro', label: 'nueve − cuatro' },
+    ]
+};
+
+function loadExamples() {
+    const lang = langSelect.value;
+    const examples = examplesByLang[lang] || examplesByLang['en-US'];
+    examplesGrid.innerHTML = '';
+
+    examples.forEach(ex => {
+        const btn = document.createElement('button');
+        btn.className = 'example-chip';
+        btn.textContent = ex.label;
+        btn.addEventListener('click', () => {
+            addMessage(ex.cmd, 'user');
+            sendToBackend(ex.cmd);
+        });
+        examplesGrid.appendChild(btn);
     });
-});
+}
+
+// Load examples on startup and when language changes
+loadExamples();
+langSelect.addEventListener('change', loadExamples);
 
 // ===== Image Upload =====
 uploadBtn.addEventListener('click', () => imageInput.click());
