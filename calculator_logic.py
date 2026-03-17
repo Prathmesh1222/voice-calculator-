@@ -1,4 +1,5 @@
 import sympy
+from sympy import latex as sympy_latex
 from sympy.parsing.sympy_parser import parse_expr, standard_transformations, implicit_multiplication_application
 try:
     import pytesseract
@@ -35,6 +36,10 @@ class MathEngine:
         result = result.replace('*', '·')
         result = result.replace('sqrt', '√')
         return result
+
+    def _latex_result(self, expr):
+        """Convert SymPy expression to LaTeX string for KaTeX rendering."""
+        return sympy_latex(expr)
 
     def pretty_func_name(self, func_str):
         """Clean up a function string for display in graph titles."""
@@ -195,13 +200,13 @@ class MathEngine:
 
             solutions = sympy.solve(equation, x)
             if not solutions:
-                return "No real solutions found"
+                return {'display': 'No real solutions found', 'speech': 'No real solutions found'}
 
             pretty_solutions = [self._pretty_result(s) for s in solutions]
-            if len(pretty_solutions) == 1:
-                return f"x = {pretty_solutions[0]}"
-            else:
-                return f"x = {', '.join(pretty_solutions)}"
+            latex_solutions = [self._latex_result(s) for s in solutions]
+            speech = f"x equals {', '.join(pretty_solutions)}"
+            display = f"$$x = {', \\;'.join(latex_solutions)}$$"
+            return {'display': display, 'speech': speech}
         except Exception:
             return None
 
@@ -345,7 +350,11 @@ class MathEngine:
                     return None
                 result = sympy.diff(expr, x)
                 pretty = self._pretty_result(result)
-                return f"Derivative = {pretty}"
+                latex_str = self._latex_result(result)
+                return {
+                    'display': f"Derivative: $$\\frac{{d}}{{dx}} {self._latex_result(expr)} = {latex_str}$$",
+                    'speech': f"Derivative is {pretty}"
+                }
             except Exception:
                 return None
 
@@ -359,7 +368,11 @@ class MathEngine:
                     return None
                 result = sympy.integrate(expr, x)
                 pretty = self._pretty_result(result)
-                return f"Integral = {pretty} + C"
+                latex_str = self._latex_result(result)
+                return {
+                    'display': f"Integral: $$\\int {self._latex_result(expr)} \\, dx = {latex_str} + C$$",
+                    'speech': f"Integral is {pretty} plus C"
+                }
             except Exception:
                 return None
 

@@ -494,6 +494,55 @@ header p {
     box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
 }
 
+/* Language Selector */
+.lang-wrapper {
+    display: flex;
+    align-items: center;
+}
+
+.lang-select {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+    box-shadow: var(--shadow-sm);
+    -webkit-appearance: none;
+}
+
+.lang-select:focus {
+    border-color: var(--primary);
+}
+
+/* Live Transcription Glow */
+#textInput.live-input {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+    animation: liveGlow 1.5s infinite;
+}
+
+@keyframes liveGlow {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1); }
+    50% { box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.2); }
+}
+
+/* KaTeX in chat bubbles */
+.msg-bubble .katex-display {
+    margin: 8px 0 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.msg-bubble .katex {
+    font-size: 1.1em;
+}
+
 /* ===== STATUS BAR ===== */
 .status-bar {
     text-align: center;

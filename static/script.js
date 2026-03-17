@@ -9,7 +9,7 @@ const textInput = document.getElementById('textInput');
 const sendBtn = document.getElementById('sendBtn');
 const loader = document.getElementById('loader');
 const exportBtn = document.getElementById('exportBtn');
-
+const langSelect = document.getElementById('langSelect');
 
 // ===== Chat History =====
 let chatHistory = [];
@@ -20,6 +20,18 @@ function removeWelcome() {
         const welcome = chatArea.querySelector('.chat-welcome');
         if (welcome) welcome.remove();
         welcomeRemoved = true;
+    }
+}
+
+function renderKaTeX(element) {
+    if (typeof renderMathInElement === 'function') {
+        renderMathInElement(element, {
+            delimiters: [
+                {left: "$$", right: "$$", display: true},
+                {left: "$", right: "$", display: false}
+            ],
+            throwOnError: false
+        });
     }
 }
 
@@ -38,7 +50,7 @@ function addMessage(text, sender) {
     bubble.className = 'msg-bubble';
     bubble.textContent = text;
 
-    // Copy button (for bot messages)
+    // Copy button (bot only)
     if (sender === 'bot') {
         const copyBtn = document.createElement('button');
         copyBtn.className = 'copy-btn';
@@ -61,7 +73,29 @@ function addMessage(text, sender) {
     msg.appendChild(bubble);
     chatArea.appendChild(msg);
 
-    // Auto scroll
+    // Render KaTeX in the new bubble if it contains $$
+    if (text && text.includes('$$')) {
+        // Use innerHTML for KaTeX (it needs to parse the $$ markers)
+        bubble.innerHTML = text;
+        if (sender === 'bot') {
+            const copyBtn2 = document.createElement('button');
+            copyBtn2.className = 'copy-btn';
+            copyBtn2.innerHTML = '<i class="fas fa-copy"></i>';
+            copyBtn2.onclick = () => {
+                navigator.clipboard.writeText(text).then(() => {
+                    copyBtn2.innerHTML = '<i class="fas fa-check"></i>';
+                    copyBtn2.classList.add('copied');
+                    setTimeout(() => {
+                        copyBtn2.innerHTML = '<i class="fas fa-copy"></i>';
+                        copyBtn2.classList.remove('copied');
+                    }, 1500);
+                });
+            };
+            bubble.appendChild(copyBtn2);
+        }
+        renderKaTeX(bubble);
+    }
+
     chatArea.scrollTop = chatArea.scrollHeight;
 }
 
@@ -71,8 +105,9 @@ let recognition;
 try {
     recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
-    recognition.interimResults = false;
+    recognition.interimResults = true;  // Live transcription!
     recognition.maxAlternatives = 1;
+    recognition.continuous = false;
 } catch (e) {
     console.warn('SpeechRecognition not supported');
 }
@@ -98,18 +133,21 @@ if (synth.onvoiceschanged !== undefined) {
 
 function speak(text) {
     if (!text) return;
+    // Strip LaTeX markers for speech
+    text = text.replace(/\$\$/g, '').replace(/\$/g, '');
+    text = text.replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, '$1 over $2');
+    text = text.replace(/\\int/g, 'integral of');
+    text = text.replace(/\\,/g, ' ');
+    text = text.replace(/\\/g, '');
+    
     synth.cancel();
-
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.1;
     utterance.pitch = 1.0;
     if (preferredVoice) utterance.voice = preferredVoice;
-
     synth.resume();
     synth.speak(utterance);
 }
-
-
 
 // ===== Microphone =====
 micBtn.addEventListener('click', () => {
@@ -118,6 +156,8 @@ micBtn.addEventListener('click', () => {
         return;
     }
     if (!isListening) {
+        // Set language from dropdown
+        recognition.lang = langSelect.value;
         try { recognition.start(); } catch (e) {}
     } else {
         recognition.stop();
@@ -136,15 +176,38 @@ if (recognition) {
         micBtn.classList.remove('listening');
     };
 
+    // Live Transcription
     recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        addMessage(transcript, 'user');
-        sendToBackend(transcript);
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+                finalTranscript += event.results[i][0].transcript;
+            } else {
+                interimTranscript += event.results[i][0].transcript;
+            }
+        }
+
+        // Show live typing in the input box
+        if (interimTranscript) {
+            textInput.value = interimTranscript;
+            textInput.classList.add('live-input');
+            statusBar.textContent = "Listening...";
+        }
+
+        if (finalTranscript) {
+            textInput.value = '';
+            textInput.classList.remove('live-input');
+            addMessage(finalTranscript, 'user');
+            sendToBackend(finalTranscript);
+        }
     };
 
     recognition.onerror = (event) => {
         isListening = false;
         micBtn.classList.remove('listening');
+        textInput.classList.remove('live-input');
         if (event.error === 'no-speech') {
             statusBar.textContent = "No speech detected. Try again.";
         } else {
@@ -197,16 +260,13 @@ exportBtn.addEventListener('click', () => {
         addMessage("No history to export.", 'bot');
         return;
     }
-
     let content = "Voice Calculator — Chat History\n";
     content += "Exported: " + new Date().toLocaleString() + "\n";
     content += "=".repeat(40) + "\n\n";
-
     chatHistory.forEach(entry => {
         const label = entry.sender === 'user' ? 'You' : 'Calculator';
         content += `[${entry.time}] ${label}: ${entry.text}\n`;
     });
-
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -214,34 +274,24 @@ exportBtn.addEventListener('click', () => {
     a.download = 'calculator_history.txt';
     a.click();
     URL.revokeObjectURL(url);
-
     statusBar.textContent = "History exported!";
 });
 
 // ===== Backend Communication =====
-function showLoader() {
-    loader.style.display = 'flex';
-    statusBar.textContent = "Calculating...";
-}
-
-function hideLoader() {
-    loader.style.display = 'none';
-}
+function showLoader() { loader.style.display = 'flex'; statusBar.textContent = "Calculating..."; }
+function hideLoader() { loader.style.display = 'none'; }
 
 async function sendToBackend(text) {
     showLoader();
-
     try {
         const response = await fetch('/process_command', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: text })
+            body: JSON.stringify({ text: text, lang: langSelect.value })
         });
-
         const data = await response.json();
         hideLoader();
         handleResponse(data);
-
     } catch (error) {
         hideLoader();
         addMessage("Error connecting to server.", 'bot');
@@ -255,32 +305,23 @@ async function uploadImage(file) {
     statusBar.textContent = "Uploading & Analyzing...";
     const formData = new FormData();
     formData.append('image', file);
-
     try {
-        const response = await fetch('/upload_image', {
-            method: 'POST',
-            body: formData
-        });
-
+        const response = await fetch('/upload_image', { method: 'POST', body: formData });
         const data = await response.json();
         hideLoader();
-
         if (data.error) {
             addMessage("Error: " + data.error, 'bot');
             speak("I couldn't read that image.");
         } else {
             addMessage("[Image]: " + data.text, 'user');
             if (data.result) {
-                playDing();
                 addMessage(data.result, 'bot');
                 speak(data.speech || "The result is " + data.result);
             } else {
                 addMessage("Could not calculate result.", 'bot');
-                speak("I found text but couldn't calculate a result.");
             }
         }
         statusBar.textContent = "Ready";
-
     } catch (error) {
         hideLoader();
         addMessage("Upload failed.", 'bot');
@@ -290,7 +331,6 @@ async function uploadImage(file) {
 
 // ===== Response Handler =====
 function handleResponse(data) {
-    // 1. Antigravity
     if (data.action === 'antigravity') {
         addMessage("🚀 Antigravity Activated!", 'bot');
         speak(data.speech);
@@ -299,33 +339,24 @@ function handleResponse(data) {
         return;
     }
 
-    // 2. Graph
     if (data.graph) {
         const img = document.createElement('img');
         img.src = "data:image/png;base64," + data.graph;
-
         graphContainer.innerHTML = '';
         graphContainer.appendChild(img);
 
-        // Download button
         const dlBtn = document.createElement('button');
         dlBtn.className = 'graph-download-btn';
         dlBtn.innerHTML = '<i class="fas fa-download"></i> Download Graph';
-        dlBtn.onclick = () => {
-            const a = document.createElement('a');
-            a.href = img.src;
-            a.download = 'graph.png';
-            a.click();
-        };
+        dlBtn.onclick = () => { const a = document.createElement('a'); a.href = img.src; a.download = 'graph.png'; a.click(); };
         graphContainer.appendChild(dlBtn);
 
-        addMessage(data.result, 'bot');
+        if (data.result) addMessage(data.result, 'bot');
         speak(data.speech);
         statusBar.textContent = "Graph Displayed";
         return;
     }
 
-    // 3. Text Result
     if (data.result) {
         addMessage(data.result, 'bot');
         speak(data.speech);
@@ -336,7 +367,7 @@ function handleResponse(data) {
     statusBar.textContent = "Ready";
 }
 
-// ===== PWA Service Worker =====
+// ===== PWA =====
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/static/sw.js').catch(() => {});
 }

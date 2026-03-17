@@ -5,4 +5,5 @@ sympy
 Pillow
 pytesseract
 gunicorn
+deep-translator
 # speech_recognition, pyaudio, pyttsx3 are Desktop only and removed to prevent Vercel build errors
