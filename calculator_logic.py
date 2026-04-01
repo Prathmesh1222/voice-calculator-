@@ -42,12 +42,27 @@ class MathEngine:
         return sympy_latex(expr)
 
     def pretty_func_name(self, func_str):
-        """Clean up a function string for display in graph titles."""
+        """Clean up a function string for professional mathematical display."""
         pretty = func_str.strip()
-        pretty = re.sub(r'\s*\*\*\s*', '**', pretty)
-        pretty = pretty.replace('**2', '²').replace('**3', '³')
-        pretty = pretty.replace('**', '^')
+        
+        # 1. Reconstruct (LHS)-(RHS) -> LHS = RHS
+        # Pattern: (expression)-(number or expression)
+        match = re.match(r'^\((.*)\)-\((.*)\)$', pretty)
+        if not match:
+             # Try without inner parens: (expression)-number
+             match = re.match(r'^\((.*)\)-(.*)$', pretty)
+             
+        if match:
+            lhs, rhs = match.groups()
+            pretty = f"{lhs} = {rhs}"
+            
+        # 2. Basic cleanup
+        pretty = re.sub(r'\s*\*\*\s*', '^', pretty) # Use standard ^ for titles
         pretty = pretty.replace('*', '·')
+        pretty = re.sub(r'\s*(\+|-|=)\s*', r' \1 ', pretty) # Standard spacing
+        
+        # 3. Final polish
+        pretty = pretty.replace('  ', ' ').strip()
         return pretty
 
     def clean_voice_text(self, text):

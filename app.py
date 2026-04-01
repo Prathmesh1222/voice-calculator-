@@ -170,10 +170,15 @@ def handle_graphing(intent, is_3d, response):
                     response['result'] = "3D Plot Error"
                     return response
 
-            ax.set_title(f"z = {pretty_func}", fontsize=13)
-            ax.set_xlabel('x')
-            ax.set_ylabel('y')
-            ax.set_zlabel('z')
+            if levels and len(levels) > 1:
+                title_str = f"z = {pretty_func}\nLevels: {', '.join(map(str, levels))}"
+            else:
+                title_str = f"z = {pretty_func}"
+            
+            ax.set_title(title_str, fontsize=15, fontweight='bold', pad=20)
+            ax.set_xlabel('x-axis', fontsize=12, fontweight='600')
+            ax.set_ylabel('y-axis', fontsize=12, fontweight='600')
+            ax.set_zlabel('z-axis', fontsize=12, fontweight='600')
         else:
             plt.figure(figsize=(6, 4))
             if is_implicit:
@@ -184,21 +189,28 @@ def handle_graphing(intent, is_3d, response):
                 Z = f_lambdified(X, Y)
                 if np.isscalar(Z): Z = np.full(X.shape, Z)
                 
-                if levels:
+                if levels and len(levels) > 1:
                     # Multi-level contour plot
                     cs = plt.contour(X, Y, Z, levels=levels, cmap='plasma')
                     plt.clabel(cs, inline=True, fontsize=10)
-                    plt.title(f"Multi-level Plot: {pretty_func}", fontsize=14)
+                    plt.title(f"Contours of: {pretty_func}", fontsize=15, fontweight='bold', pad=15)
+                elif levels and len(levels) == 1:
+                    # Single level from a list input
+                    plt.contour(X, Y, Z, [levels[0]], colors=['#6366f1'])
+                    plt.title(f"Plot of: {pretty_func}", fontsize=15, fontweight='bold', pad=15)
                 else:
                     plt.contour(X, Y, Z, [0], colors=['#6366f1'])
-                    plt.title(f"Implicit Plot: {pretty_func} = 0", fontsize=14)
+                    plt.title(f"Plot of: {pretty_func}", fontsize=15, fontweight='bold', pad=15)
             else:
                 f_lambdified = sympy.lambdify(x_sym, f, modules=['numpy'])
                 x_vals = np.linspace(-10, 10, 400)
                 y_vals = f_lambdified(x_vals)
                 if np.isscalar(y_vals): y_vals = np.full(x_vals.shape, y_vals)
-                plt.plot(x_vals, y_vals, color='#6366f1', linewidth=2)
-                plt.title(f"y = {pretty_func}", fontsize=14)
+                plt.plot(x_vals, y_vals, color='#6366f1', linewidth=2.5)
+                plt.title(f"y = {pretty_func}", fontsize=15, fontweight='bold', pad=15)
+
+            plt.xlabel('x-axis', fontsize=12, fontweight='600')
+            plt.ylabel('y-axis', fontsize=12, fontweight='600')
 
             plt.grid(True, alpha=0.3)
             plt.tight_layout()
