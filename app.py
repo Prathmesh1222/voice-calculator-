@@ -22,6 +22,7 @@ try:
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D
     import sympy
+    from sympy import sympify as sympy_sympify
     import numpy as np
 
     from calculator_logic import MathEngine, ImageHandler
@@ -179,40 +180,66 @@ def handle_graphing(intent, is_3d, response):
             ax.set_xlabel('x-axis', fontsize=12, fontweight='600')
             ax.set_ylabel('y-axis', fontsize=12, fontweight='600')
             ax.set_zlabel('z-axis', fontsize=12, fontweight='600')
-        else:
-            plt.figure(figsize=(6, 4))
+            # Professional Aesthetics: Center Spines at (0,0)
+            ax = plt.gca()
+            ax.spines['left'].set_position('zero')
+            ax.spines['bottom'].set_position('zero')
+            ax.spines['right'].set_color('none')
+            ax.spines['top'].set_color('none')
+            ax.xaxis.set_ticks_position('bottom')
+            ax.yaxis.set_ticks_position('left')
+            
+            # Subtler offset for tick labels
+            ax.tick_params(axis='both', which='major', labelsize=9, pad=5)
+            
             if is_implicit:
-                x_vals = np.linspace(-10, 10, 400)
-                y_vals = np.linspace(-10, 10, 400)
+                # Calculate intercepts for annotation
+                intercepts = math_engine.get_intercepts(func_str)
+                
+                # Determine plot bounds dynamically based on intercepts
+                if intercepts:
+                    vals = [v for pt in intercepts for v in pt]
+                    limit = max(abs(min(vals)), abs(max(vals)), 2) * 1.5
+                    x_bound, y_bound = limit, limit
+                else:
+                    x_bound, y_bound = 10, 10
+                
+                x_vals = np.linspace(-x_bound, x_bound, 400)
+                y_vals = np.linspace(-y_bound, y_bound, 400)
                 X, Y = np.meshgrid(x_vals, y_vals)
                 f_lambdified = sympy.lambdify((x_sym, y_sym), f, modules=['numpy'])
                 Z = f_lambdified(X, Y)
                 if np.isscalar(Z): Z = np.full(X.shape, Z)
                 
                 if levels and len(levels) > 1:
-                    # Multi-level contour plot
-                    cs = plt.contour(X, Y, Z, levels=levels, cmap='plasma')
+                    cs = plt.contour(X, Y, Z, levels=levels, cmap='plasma', linewidths=2)
                     plt.clabel(cs, inline=True, fontsize=10)
-                    plt.title(f"Contours of: {pretty_func}", fontsize=15, fontweight='bold', pad=15)
-                elif levels and len(levels) == 1:
-                    # Single level from a list input
-                    plt.contour(X, Y, Z, [levels[0]], colors=['#6366f1'])
-                    plt.title(f"Plot of: {pretty_func}", fontsize=15, fontweight='bold', pad=15)
+                    plt.title(f"Contours of: {pretty_func}", fontsize=15, fontweight='bold', pad=25)
                 else:
-                    plt.contour(X, Y, Z, [0], colors=['#6366f1'])
-                    plt.title(f"Plot of: {pretty_func}", fontsize=15, fontweight='bold', pad=15)
+                    target = levels[0] if levels else 0
+                    plt.contour(X, Y, Z, [target], colors=['#3b82f6'], linewidths=2.5, label=f"{pretty_func}")
+                    plt.title(f"Graph of {pretty_func}", fontsize=15, fontweight='bold', pad=25)
+                    
+                    # Plot Intercepts as Red Dots
+                    for ix, iy in intercepts:
+                        plt.plot(ix, iy, 'ro', markersize=6, zorder=5)
+                        plt.annotate(f'({ix:g}, {iy:g})', (ix, iy), 
+                                     textcoords="offset points", xytext=(10,10), 
+                                     ha='left', fontsize=9, fontweight='600',
+                                     bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7, ec='none'))
             else:
+                # Explicit y = f(x)
                 f_lambdified = sympy.lambdify(x_sym, f, modules=['numpy'])
                 x_vals = np.linspace(-10, 10, 400)
                 y_vals = f_lambdified(x_vals)
                 if np.isscalar(y_vals): y_vals = np.full(x_vals.shape, y_vals)
-                plt.plot(x_vals, y_vals, color='#6366f1', linewidth=2.5)
-                plt.title(f"y = {pretty_func}", fontsize=15, fontweight='bold', pad=15)
+                plt.plot(x_vals, y_vals, color='#3b82f6', linewidth=2.5, label=f"y = {pretty_func}")
+                plt.title(f"Graph of y = {pretty_func}", fontsize=15, fontweight='bold', pad=25)
 
-            plt.xlabel('x-axis', fontsize=12, fontweight='600')
-            plt.ylabel('y-axis', fontsize=12, fontweight='600')
+            plt.xlabel('x', loc='right', fontsize=11, fontweight='bold')
+            plt.ylabel('y', loc='top', fontsize=11, fontweight='bold', rotation=0)
 
-            plt.grid(True, alpha=0.3)
+            plt.grid(True, linestyle='--', alpha=0.5, color='#cbd5e1')
             plt.tight_layout()
 
         img = io.BytesIO()

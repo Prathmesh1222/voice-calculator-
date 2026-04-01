@@ -37,6 +37,34 @@ class MathEngine:
         result = result.replace('sqrt', '√')
         return result
 
+    def get_intercepts(self, expr_str):
+        """Find x and y intercepts for a 2D expression (LHS-RHS format)."""
+        x_sym, y_sym = sympy.symbols('x y')
+        try:
+            expr = sympy.sympify(expr_str)
+            intercepts = []
+            
+            # y-intercepts: set x = 0
+            # Solve returns a list of values for the variable
+            y_solutions = sympy.solve(expr.subs(x_sym, 0), y_sym)
+            for y_val in y_solutions:
+                try:
+                    if float(y_val) or y_val == 0:
+                        intercepts.append((0, float(y_val)))
+                except (TypeError, ValueError): continue
+            
+            # x-intercepts: set y = 0
+            x_solutions = sympy.solve(expr.subs(y_sym, 0), x_sym)
+            for x_val in x_solutions:
+                try:
+                    if float(x_val) or x_val == 0:
+                        intercepts.append((float(x_val), 0))
+                except (TypeError, ValueError): continue
+            
+            return intercepts
+        except Exception:
+            return []
+
     def _latex_result(self, expr):
         """Convert SymPy expression to LaTeX string for KaTeX rendering."""
         return sympy_latex(expr)
