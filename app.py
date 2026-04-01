@@ -118,6 +118,7 @@ def process_single_command(text):
 
     return response
 
+
 def handle_graphing(intent, is_3d, response):
     func_str = intent['expression']
     levels = intent.get('levels', [])
@@ -128,7 +129,6 @@ def handle_graphing(intent, is_3d, response):
                       'log': sympy.log, 'exp': sympy.exp, 'sqrt': sympy.sqrt,
                       'abs': sympy.Abs}
 
-        # Handle implicit equations like x**2 + y**2 - 4
         is_implicit = False
         if any(token in func_str for token in ["- (", "==", "="]) or levels:
              is_implicit = True
@@ -138,18 +138,26 @@ def handle_graphing(intent, is_3d, response):
         
         plt.close('all')
         
+        # --- DYNAMIC BOUNDS CALCULATION ---
+        # Calculate intercepts to scale the grid based on the equation's size
+        intercepts = math_engine.get_intercepts(func_str)
+        if intercepts:
+            vals = [v for pt in intercepts for v in pt]
+            limit = max(abs(min(vals)), abs(max(vals)), 2) * 1.5
+            x_bound, y_bound = limit, limit
+        else:
+            x_bound, y_bound = 10, 10
+            
         if is_3d:
-            # ==========================================
-            # 3D GRAPHING BLOCK
-            # ==========================================
             fig = plt.figure(figsize=(7, 5))
             ax = fig.add_subplot(111, projection='3d')
             
-            x_vals = np.linspace(-5, 5, 50)
-            y_vals = np.linspace(-5, 5, 50)
+            x_vals = np.linspace(-x_bound, x_bound, 60)
+            y_vals = np.linspace(-y_bound, y_bound, 60)
             X, Y = np.meshgrid(x_vals, y_vals)
             
-            if levels:
+            # Only use the multi-level loop if there are actually MULTIPLE levels
+            if levels and len(levels) > 1:
                 f_lambdified = sympy.lambdify((x_sym, y_sym), f, modules=['numpy'])
                 colors = plt.cm.viridis(np.linspace(0, 1, len(levels)))
                 for idx, level in enumerate(levels):
@@ -159,6 +167,7 @@ def handle_graphing(intent, is_3d, response):
                         ax.plot_surface(X, Y, Z, color=colors[idx], alpha=0.5, label=f"Level {level}")
                     except Exception: continue
             else:
+                # Standard surface plotting
                 f_lambdified = sympy.lambdify((x_sym, y_sym), f, modules=['numpy'])
                 try:
                     Z = f_lambdified(X, Y)
@@ -169,47 +178,28 @@ def handle_graphing(intent, is_3d, response):
                     response['result'] = "3D Plot Error"
                     return response
 
-            if levels and len(levels) > 1:
-                title_str = f"z = {pretty_func}\nLevels: {', '.join(map(str, levels))}"
-            else:
-                title_str = f"z = {pretty_func}"
+            title_str = f"z = {pretty_func}\nLevels: {', '.join(map(str, levels))}" if levels and len(levels) > 1 else f"z = {pretty_func}"
             
             ax.set_title(title_str, fontsize=15, fontweight='bold', pad=20)
-            ax.set_xlabel('x-axis', fontsize=12, fontweight='600')
-            ax.set_ylabel('y-axis', fontsize=12, fontweight='600')
-            ax.set_zlabel('z-axis', fontsize=12, fontweight='600')
-            
-            # Subtler offset for tick labels
-            ax.tick_params(axis='both', which='major', labelsize=9, pad=5)
+            ax.set_xlabel('x-axis', fontsize=11, fontweight='600', labelpad=8)
+            ax.set_ylabel('y-axis', fontsize=11, fontweight='600', labelpad=8)
+            ax.set_zlabel('z-axis', fontsize=11, fontweight='600', labelpad=8)
+            ax.tick_params(axis='both', which='major', labelsize=9, pad=3)
 
         else:
-            # ==========================================
-            # 2D GRAPHING BLOCK
-            # ==========================================
             fig = plt.figure(figsize=(7, 5))
             ax = fig.add_subplot(111)
             
-            # Professional Aesthetics: Center Spines at (0,0)
+            # Center Spines at (0,0)
             ax.spines['left'].set_position('zero')
             ax.spines['bottom'].set_position('zero')
             ax.spines['right'].set_color('none')
             ax.spines['top'].set_color('none')
             ax.xaxis.set_ticks_position('bottom')
             ax.yaxis.set_ticks_position('left')
-            ax.tick_params(axis='both', which='major', labelsize=9, pad=5)
+            ax.tick_params(axis='both', which='major', labelsize=9)
             
             if is_implicit:
-                # Calculate intercepts for annotation
-                intercepts = math_engine.get_intercepts(func_str)
-                
-                # Determine plot bounds dynamically based on intercepts
-                if intercepts:
-                    vals = [v for pt in intercepts for v in pt]
-                    limit = max(abs(min(vals)), abs(max(vals)), 2) * 1.5
-                    x_bound, y_bound = limit, limit
-                else:
-                    x_bound, y_bound = 10, 10
-                
                 x_vals = np.linspace(-x_bound, x_bound, 400)
                 y_vals = np.linspace(-y_bound, y_bound, 400)
                 X, Y = np.meshgrid(x_vals, y_vals)
@@ -222,8 +212,8 @@ def handle_graphing(intent, is_3d, response):
                     plt.clabel(cs, inline=True, fontsize=10)
                     plt.title(f"Contours of: {pretty_func}", fontsize=15, fontweight='bold', pad=25)
                 else:
-                    target = levels[0] if levels else 0
-                    plt.contour(X, Y, Z, [target], colors=['#3b82f6'], linewidths=2.5, label=f"{pretty_func}")
+                    # FIX: Always contour at 0 for standard implicit equations
+                    plt.contour(X, Y, Z, [0], colors=['#3b82f6'], linewidths=2.5)
                     plt.title(f"Graph of {pretty_func}", fontsize=15, fontweight='bold', pad=25)
                     
                     # Plot Intercepts as Red Dots
@@ -232,11 +222,11 @@ def handle_graphing(intent, is_3d, response):
                         plt.annotate(f'({ix:g}, {iy:g})', (ix, iy), 
                                      textcoords="offset points", xytext=(10,10), 
                                      ha='left', fontsize=9, fontweight='600',
-                                     bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7, ec='none'))
+                                     bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.8, ec='gray'))
             else:
                 # Explicit y = f(x)
                 f_lambdified = sympy.lambdify(x_sym, f, modules=['numpy'])
-                x_vals = np.linspace(-10, 10, 400)
+                x_vals = np.linspace(-x_bound, x_bound, 400)
                 y_vals = f_lambdified(x_vals)
                 if np.isscalar(y_vals): y_vals = np.full(x_vals.shape, y_vals)
                 plt.plot(x_vals, y_vals, color='#3b82f6', linewidth=2.5, label=f"y = {pretty_func}")
@@ -244,13 +234,9 @@ def handle_graphing(intent, is_3d, response):
 
             plt.xlabel('x', loc='right', fontsize=11, fontweight='bold')
             plt.ylabel('y', loc='top', fontsize=11, fontweight='bold', rotation=0)
-
             plt.grid(True, linestyle='--', alpha=0.5, color='#cbd5e1')
             plt.tight_layout()
 
-        # ==========================================
-        # RENDER TO IMAGE
-        # ==========================================
         img = io.BytesIO()
         plt.savefig(img, format='png', bbox_inches='tight', dpi=100)
         img.seek(0)
