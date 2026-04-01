@@ -120,6 +120,10 @@ def process_single_command(text):
 
 
 def handle_graphing(intent, is_3d, response):
+    import warnings
+    # Ignore complex/nan numpy warnings for partial 3D surfaces (like spheres)
+    warnings.filterwarnings('ignore') 
+    
     func_str = intent['expression']
     levels = intent.get('levels', [])
     try:
@@ -139,46 +143,83 @@ def handle_graphing(intent, is_3d, response):
         plt.close('all')
         
         # --- DYNAMIC BOUNDS CALCULATION ---
-        # Calculate intercepts to scale the grid based on the equation's size
         intercepts = math_engine.get_intercepts(func_str)
         if intercepts:
             vals = [v for pt in intercepts for v in pt]
-            limit = max(abs(min(vals)), abs(max(vals)), 2) * 1.5
+            # Increased minimum base limit so parabolas like y^2=4x are highly visible
+            limit = max(abs(min(vals)), abs(max(vals)), 6) * 1.25 
             x_bound, y_bound = limit, limit
         else:
-            x_bound, y_bound = 10, 10
+            x_bound, y_bound = 12, 12
             
         if is_3d:
             fig = plt.figure(figsize=(7, 5))
             ax = fig.add_subplot(111, projection='3d')
             
-            x_vals = np.linspace(-x_bound, x_bound, 60)
-            y_vals = np.linspace(-y_bound, y_bound, 60)
+            x_vals = np.linspace(-x_bound, x_bound, 80)
+            y_vals = np.linspace(-y_bound, y_bound, 80)
             X, Y = np.meshgrid(x_vals, y_vals)
             
-            # Only use the multi-level loop if there are actually MULTIPLE levels
-            if levels and len(levels) > 1:
-                f_lambdified = sympy.lambdify((x_sym, y_sym), f, modules=['numpy'])
-                colors = plt.cm.viridis(np.linspace(0, 1, len(levels)))
-                for idx, level in enumerate(levels):
+            if is_implicit:
+                if z_sym not in f.free_symbols:
+                    # TRUE CYLINDER: Extruded 2D shape (like x^2 + y^2 = 4)
+                    f_lambdified = sympy.lambdify((x_sym, y_sym), f, modules=['numpy'])
+                    Z_eval = f_lambdified(X, Y)
+                    if np.isscalar(Z_eval): Z_eval = np.full(X.shape, Z_eval)
+                    
+                    # Stack contours along Z axis to form a 3D wireframe cylinder
                     try:
-                        Z = f_lambdified(X, Y) + level
-                        if np.isscalar(Z): Z = np.full(X.shape, Z)
-                        ax.plot_surface(X, Y, Z, color=colors[idx], alpha=0.5, label=f"Level {level}")
-                    except Exception: continue
+                        for z_val in np.linspace(-x_bound, x_bound, 40):
+                            ax.contour(X, Y, Z_eval, levels=[0], zdir='z', offset=z_val, colors='#4f46e5', alpha=0.5)
+                        ax.set_zlim(-x_bound, x_bound)
+                    except Exception:
+                        pass
+                else:
+                    # TRUE 3D IMPLICIT (like x^2 + y^2 + z^2 = 9)
+                    z_sols = sympy.solve(f, z_sym)
+                    if z_sols:
+                        for sol in z_sols:
+                            sol_lam = sympy.lambdify((x_sym, y_sym), sol, modules=['numpy'])
+                            Z = sol_lam(X, Y)
+                            if np.isscalar(Z): Z = np.full(X.shape, Z)
+                            
+                            # Hide invalid/imaginary values (prevents crashes on spheres)
+                            if np.iscomplexobj(Z) or Z.dtype == object:
+                                Z = np.array(Z, dtype=complex)
+                                Z[np.iscomplex(Z)] = np.nan
+                                Z = np.real(Z)
+                                
+                            ax.plot_surface(X, Y, Z, cmap='plasma', alpha=0.7)
+                    else:
+                        response['speech'] = "I couldn't solve this 3D equation."
+                        response['result'] = "3D Plot Error"
+                        return response
             else:
-                # Standard surface plotting
-                f_lambdified = sympy.lambdify((x_sym, y_sym), f, modules=['numpy'])
-                try:
-                    Z = f_lambdified(X, Y)
-                    if np.isscalar(Z): Z = np.full(X.shape, Z)
-                    ax.plot_surface(X, Y, Z, cmap='viridis', alpha=0.85)
-                except Exception:
-                    response['speech'] = "I couldn't generate a 3D surface for that."
-                    response['result'] = "3D Plot Error"
-                    return response
+                # Standard explicit 3D surface (z = f(x,y))
+                if levels and len(levels) > 1:
+                    f_lambdified = sympy.lambdify((x_sym, y_sym), f, modules=['numpy'])
+                    colors = plt.cm.viridis(np.linspace(0, 1, len(levels)))
+                    for idx, level in enumerate(levels):
+                        try:
+                            Z = f_lambdified(X, Y) + level
+                            if np.isscalar(Z): Z = np.full(X.shape, Z)
+                            ax.plot_surface(X, Y, Z, color=colors[idx], alpha=0.5, label=f"Level {level}")
+                        except Exception: continue
+                else:
+                    f_lambdified = sympy.lambdify((x_sym, y_sym), f, modules=['numpy'])
+                    try:
+                        Z = f_lambdified(X, Y)
+                        if np.isscalar(Z): Z = np.full(X.shape, Z)
+                        ax.plot_surface(X, Y, Z, cmap='viridis', alpha=0.85)
+                    except Exception:
+                        response['speech'] = "I couldn't generate a 3D surface for that."
+                        response['result'] = "3D Plot Error"
+                        return response
 
+            # Clean Titles
             title_str = f"z = {pretty_func}\nLevels: {', '.join(map(str, levels))}" if levels and len(levels) > 1 else f"z = {pretty_func}"
+            if is_implicit and not levels:
+                title_str = f"3D Graph of {pretty_func}"
             
             ax.set_title(title_str, fontsize=15, fontweight='bold', pad=20)
             ax.set_xlabel('x-axis', fontsize=11, fontweight='600', labelpad=8)
@@ -190,7 +231,6 @@ def handle_graphing(intent, is_3d, response):
             fig = plt.figure(figsize=(7, 5))
             ax = fig.add_subplot(111)
             
-            # Center Spines at (0,0)
             ax.spines['left'].set_position('zero')
             ax.spines['bottom'].set_position('zero')
             ax.spines['right'].set_color('none')
@@ -212,11 +252,10 @@ def handle_graphing(intent, is_3d, response):
                     plt.clabel(cs, inline=True, fontsize=10)
                     plt.title(f"Contours of: {pretty_func}", fontsize=15, fontweight='bold', pad=25)
                 else:
-                    # FIX: Always contour at 0 for standard implicit equations
+                    # Plots Parabola (y^2 = 4x) or Circle (x^2+y^2=25)
                     plt.contour(X, Y, Z, [0], colors=['#3b82f6'], linewidths=2.5)
                     plt.title(f"Graph of {pretty_func}", fontsize=15, fontweight='bold', pad=25)
                     
-                    # Plot Intercepts as Red Dots
                     for ix, iy in intercepts:
                         plt.plot(ix, iy, 'ro', markersize=6, zorder=5)
                         plt.annotate(f'({ix:g}, {iy:g})', (ix, iy), 
@@ -224,7 +263,6 @@ def handle_graphing(intent, is_3d, response):
                                      ha='left', fontsize=9, fontweight='600',
                                      bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.8, ec='gray'))
             else:
-                # Explicit y = f(x)
                 f_lambdified = sympy.lambdify(x_sym, f, modules=['numpy'])
                 x_vals = np.linspace(-x_bound, x_bound, 400)
                 y_vals = f_lambdified(x_vals)
