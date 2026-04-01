@@ -44,7 +44,7 @@ except Exception as e:
 
 
 def process_single_command(text):
-    """Process a single command and return a response dict."""
+    """Process a single command using intent parsing and return a response dict."""
     response = {
         'speech': '',
         'result': '',
@@ -52,126 +52,172 @@ def process_single_command(text):
         'action': None
     }
 
-    # 1. Antigravity
-    if math_engine.check_antigravity(text):
-        response['action'] = 'antigravity'
-        response['speech'] = 'Activating anti gravity mode'
-        response['result'] = 'Antigravity Activated 🚀'
-        return response
+    try:
+        # 1. Antigravity check
+        if math_engine.check_antigravity(text):
+            response['action'] = 'antigravity'
+            response['speech'] = 'Activating anti gravity mode'
+            response['result'] = 'Antigravity Activated 🚀'
+            return response
 
-    # 2. Unit Conversion
-    conversion = math_engine.check_unit_conversion(text)
-    if conversion:
-        response['result'] = conversion
-        response['speech'] = conversion
-        return response
+        # 2. Parse Intent
+        intent = math_engine.parse_intent(text)
+        action = intent['action']
+        expr_str = intent['expression']
+        response['action'] = action
 
-    # 3. Equation Solving (now returns dict with display/speech)
-    equation = math_engine.check_equation(text)
-    if equation:
-        if isinstance(equation, dict):
-            response['result'] = equation.get('display', '')
-            response['speech'] = equation.get('speech', '')
+        # 3. Handle Actions
+        if action == "PLOT_2D" or action == "PLOT_3D":
+             return handle_graphing(intent, action == "PLOT_3D", response)
+        
+        elif action == "SOLVE":
+            result = math_engine.check_equation(text)
+            if result:
+                response['result'] = result.get('display', '')
+                response['speech'] = result.get('speech', '')
+                return response
+
+        elif action == "DERIVE" or action == "INTEGRATE":
+            result = math_engine.check_calculus(text)
+            if result:
+                response['result'] = result.get('display', '')
+                response['speech'] = result.get('speech', '')
+                return response
+
+        # Fallback to Unit Conversion or General Evaluation
+        conversion = math_engine.check_unit_conversion(text)
+        if conversion:
+            response['result'] = conversion
+            response['speech'] = conversion
+            return response
+
+        matrix = math_engine.check_matrix(text)
+        if matrix:
+            response['result'] = matrix
+            response['speech'] = matrix
+            return response
+
+        result = math_engine.evaluate(text)
+        if result:
+            response['result'] = result
+            response['speech'] = f"The answer is {result}"
         else:
-            response['result'] = equation
-            response['speech'] = equation
-        return response
+            response['speech'] = "I didn't understand that math. Could you rephrase?"
+            response['result'] = None
 
-    # 4. Matrix Operations
-    matrix = math_engine.check_matrix(text)
-    if matrix:
-        response['result'] = matrix
-        response['speech'] = matrix
-        return response
+    except sympy.SympifyError:
+        response['speech'] = "I caught the equation, but the format is a bit tricky."
+        response['result'] = f"Parsing Error: Could not understand '{text}'"
+    except ZeroDivisionError:
+        response['speech'] = "Wait, I can't divide by zero!"
+        response['result'] = "Error: Division by zero"
+    except Exception as e:
+        response['speech'] = "Something went wrong while calculating."
+        response['result'] = f"Error: {str(e)}"
 
-    # 5. Graphing (2D and 3D)
-    if math_engine.is_graphing_command(text):
-        is_3d = '3d' in text.lower()
-        func_str = math_engine.get_graph_function(text)
+    return response
 
-        # Auto-detect 3D if 'y' is in the expression
-        if 'y' in func_str and not is_3d:
-            is_3d = True
+def handle_graphing(intent, is_3d, response):
+    func_str = intent['expression']
+    levels = intent.get('levels', [])
+    try:
+        x_sym, y_sym, z_sym = sympy.symbols('x y z')
+        local_dict = {'x': x_sym, 'y': y_sym, 'z': z_sym,
+                      'sin': sympy.sin, 'cos': sympy.cos, 'tan': sympy.tan,
+                      'log': sympy.log, 'exp': sympy.exp, 'sqrt': sympy.sqrt,
+                      'abs': sympy.Abs}
 
-        try:
-            x_sym, y_sym = sympy.symbols('x y')
-            local_dict = {'x': x_sym, 'y': y_sym,
-                          'sin': sympy.sin, 'cos': sympy.cos, 'tan': sympy.tan,
-                          'log': sympy.log, 'exp': sympy.exp, 'sqrt': sympy.sqrt,
-                          'abs': sympy.Abs}
+        # Handle implicit equations like x**2 + y**2 - 4
+        is_implicit = False
+        if any(token in func_str for token in ["- (", "==", "="]) or levels:
+             is_implicit = True
 
-            f = sympy.sympify(func_str, locals=local_dict)
-
-            if is_3d:
-                # 3D Surface Plot
-                fig = plt.figure(figsize=(7, 5))
-                ax = fig.add_subplot(111, projection='3d')
-
+        f = sympy.sympify(func_str, locals=local_dict)
+        pretty_func = math_engine.pretty_func_name(func_str)
+        
+        plt.close('all')
+        if is_3d:
+            fig = plt.figure(figsize=(7, 5))
+            ax = fig.add_subplot(111, projection='3d')
+            
+            x_vals = np.linspace(-5, 5, 50)
+            y_vals = np.linspace(-5, 5, 50)
+            X, Y = np.meshgrid(x_vals, y_vals)
+            
+            if levels:
+                # Plot multiple layers of z = f(x,y) if z_sym not in variables
                 f_lambdified = sympy.lambdify((x_sym, y_sym), f, modules=['numpy'])
-
-                x_vals = np.linspace(-5, 5, 50)
-                y_vals = np.linspace(-5, 5, 50)
-                X, Y = np.meshgrid(x_vals, y_vals)
-                Z = f_lambdified(X, Y)
-
-                ax.plot_surface(X, Y, Z, cmap='viridis', alpha=0.85)
-                pretty_func = math_engine.pretty_func_name(func_str)
-                ax.set_title(f"z = {pretty_func}", fontsize=13)
-                ax.set_xlabel('x')
-                ax.set_ylabel('y')
-                ax.set_zlabel('z')
+                colors = plt.cm.viridis(np.linspace(0, 1, len(levels)))
+                for idx, level in enumerate(levels):
+                    try:
+                        # If levels provided for f(x,y)=C, we plot z = f(x,y) - C ? No.
+                        # Usually user says z = x+y with levels 4,5,6 meaning z=4, z=5?
+                        # But user request says "x+y = 4,5,3". 
+                        # If it's 3D, we'll plot surfaces of z = x+y with target levels
+                        Z = f_lambdified(X, Y) + level
+                        if np.isscalar(Z): Z = np.full(X.shape, Z)
+                        ax.plot_surface(X, Y, Z, color=colors[idx], alpha=0.5, label=f"Level {level}")
+                    except Exception: continue
             else:
-                # 2D Plot
-                plt.figure(figsize=(6, 4))
-                f_lambdified = sympy.lambdify(x_sym, f, modules=['numpy'])
+                # Standard z = f(x,y)
+                f_lambdified = sympy.lambdify((x_sym, y_sym), f, modules=['numpy'])
+                try:
+                    Z = f_lambdified(X, Y)
+                    if np.isscalar(Z): Z = np.full(X.shape, Z)
+                    ax.plot_surface(X, Y, Z, cmap='viridis', alpha=0.85)
+                except Exception:
+                    response['speech'] = "I couldn't generate a 3D surface for that."
+                    response['result'] = "3D Plot Error"
+                    return response
 
+            ax.set_title(f"z = {pretty_func}", fontsize=13)
+            ax.set_xlabel('x')
+            ax.set_ylabel('y')
+            ax.set_zlabel('z')
+        else:
+            plt.figure(figsize=(6, 4))
+            if is_implicit:
+                x_vals = np.linspace(-10, 10, 400)
+                y_vals = np.linspace(-10, 10, 400)
+                X, Y = np.meshgrid(x_vals, y_vals)
+                f_lambdified = sympy.lambdify((x_sym, y_sym), f, modules=['numpy'])
+                Z = f_lambdified(X, Y)
+                if np.isscalar(Z): Z = np.full(X.shape, Z)
+                
+                if levels:
+                    # Multi-level contour plot
+                    cs = plt.contour(X, Y, Z, levels=levels, cmap='plasma')
+                    plt.clabel(cs, inline=True, fontsize=10)
+                    plt.title(f"Multi-level Plot: {pretty_func}", fontsize=14)
+                else:
+                    plt.contour(X, Y, Z, [0], colors=['#6366f1'])
+                    plt.title(f"Implicit Plot: {pretty_func} = 0", fontsize=14)
+            else:
+                f_lambdified = sympy.lambdify(x_sym, f, modules=['numpy'])
                 x_vals = np.linspace(-10, 10, 400)
                 y_vals = f_lambdified(x_vals)
-
-                pretty_func = math_engine.pretty_func_name(func_str)
+                if np.isscalar(y_vals): y_vals = np.full(x_vals.shape, y_vals)
                 plt.plot(x_vals, y_vals, color='#6366f1', linewidth=2)
                 plt.title(f"y = {pretty_func}", fontsize=14)
-                plt.grid(True, alpha=0.3)
-                plt.tight_layout()
 
-            img = io.BytesIO()
-            plt.savefig(img, format='png', bbox_inches='tight', dpi=100)
-            img.seek(0)
-            plot_url = base64.b64encode(img.getvalue()).decode()
-            plt.close('all')
+            plt.grid(True, alpha=0.3)
+            plt.tight_layout()
 
-            pretty_func = math_engine.pretty_func_name(func_str)
-            graph_type = "3D graph" if is_3d else "Graph"
-            response['graph'] = plot_url
-            response['speech'] = f"Plotting {pretty_func}"
-            response['result'] = f"{graph_type} of {pretty_func}"
-        except Exception as e:
-            plt.close('all')
-            response['speech'] = "I could not plot that function."
-            response['result'] = f"Graph Error: {str(e)}"
+        img = io.BytesIO()
+        plt.savefig(img, format='png', bbox_inches='tight', dpi=100)
+        img.seek(0)
+        plot_url = base64.b64encode(img.getvalue()).decode()
+        plt.close('all')
 
-        return response
-
-    # 6. Calculus (now returns dict with display/speech)
-    calculus_result = math_engine.check_calculus(text)
-    if calculus_result:
-        if isinstance(calculus_result, dict):
-            response['result'] = calculus_result.get('display', '')
-            response['speech'] = calculus_result.get('speech', '')
-        else:
-            response['result'] = calculus_result
-            response['speech'] = calculus_result
-        return response
-
-    # 7. Evaluate Math
-    result = math_engine.evaluate(text)
-    if result:
-        response['result'] = result
-        response['speech'] = f"The answer is {result}"
-    else:
-        response['speech'] = "I didn't understand that."
-        response['result'] = None
-
+        graph_type = "3D graph" if is_3d else "Graph"
+        response['graph'] = plot_url
+        response['speech'] = f"Plotting {pretty_func}"
+        response['result'] = f"{graph_type} of {pretty_func}"
+    except Exception as e:
+        plt.close('all')
+        response['speech'] = "I could not plot that function."
+        response['result'] = f"Graph Error: {str(e)}"
+    
     return response
 
 
@@ -184,6 +230,19 @@ def index():
 @app.route('/about')
 def about():
     return render_template('about.html')
+
+@app.route('/parse_intent', methods=['POST'])
+def parse_intent_endpoint():
+    try:
+        data = request.get_json()
+        text = data.get('text', '').strip()
+        if not text:
+            return jsonify({'error': 'No text provided'})
+        
+        intent = math_engine.parse_intent(text)
+        return jsonify(intent)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/process_command', methods=['POST'])
 def process_command():

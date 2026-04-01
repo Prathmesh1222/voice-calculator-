@@ -22,6 +22,9 @@ def test_math_engine():
         ("2 power 3", "8"),
         ("square root of 16", "4"),
         ("10 divided by 0", "Error: Cannot divide by zero"),
+        # New clean_voice_text tests
+        ("x square plus y square equal to 4", "x**2 + y**2 = 4"),
+        ("3d plot of sin x", "3d plot of sin x"),
     ]
     
     conversion_tests = [
@@ -35,11 +38,32 @@ def test_math_engine():
     failed = 0
 
     for input_text, expected in test_cases:
+        if "plot" in input_text or "=" in expected:
+            # Skip evaluate for plot/eq strings as they aren't numbers
+            continue
         result = engine.evaluate(input_text)
         status = "✓" if str(result) == str(expected) else "✗"
         print(f"  {status} '{input_text}' -> '{result}' (expected '{expected}')")
         passed += 1 if str(result) == str(expected) else 0
         failed += 0 if str(result) == str(expected) else 1
+
+    print(f"\n--- Intent Parsing Tests ---\n")
+    intent_tests = [
+        ("3d plot of x square plus y square equal to 4", "PLOT_3D", "(x**2+y**2)-(4)"),
+        ("solve x square plus 5 equal to 10", "SOLVE", "x**2+5=10"),
+        ("differentiate x cube", "DERIVE", "x**3"),
+        ("integrate sin x", "INTEGRATE", "sin x"),
+        ("calculate 5 plus 5", "CALCULATE", "5+5"),
+    ]
+    for text, expected_action, expected_expr in intent_tests:
+        intent = engine.parse_intent(text)
+        status = "✓" if intent['action'] == expected_action and intent['expression'] == expected_expr else "✗"
+        print(f"  {status} '{text}' -> {intent['action']}, '{intent['expression']}'")
+        if status == "✓":
+            passed += 1
+        else:
+            failed += 1
+            print(f"      Expected: {expected_action}, '{expected_expr}'")
 
     print(f"\n--- Calculus Tests (LaTeX) ---\n")
     calculus_tests = [

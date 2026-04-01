@@ -50,31 +50,185 @@ class MathEngine:
         pretty = pretty.replace('*', '·')
         return pretty
 
-    def _clean_calculus_input(self, text):
-        """Shared NLP cleanup for calculus inputs."""
-        remove_words = [
-            'differentiation of', 'differentiate', 'derivative of', 'derivative',
-            'derive', 'differentiation',
-            'integration of', 'integral of', 'integrate', 'integral', 'integration',
-            'with respect to x', 'with respect to',
-            'of',
-        ]
-        for phrase in remove_words:
-            text = text.replace(phrase, ' ')
+    def clean_voice_text(self, text):
+        """Regex-based pre-processor to convert natural language to math syntax."""
+        text = text.lower().strip()
+        
+        # 0. Strip filler words from the beginning
+        text = re.sub(r'^(?:lord|hey|hi|calculator|please|ok|okay)\s*', '', text)
 
-        text = text.replace('x squared', 'x**2').replace('x cubed', 'x**3')
-        text = text.replace('squared', '**2').replace('cubed', '**3')
-        text = text.replace('square', '**2').replace('cube', '**3')
-        text = text.replace('sqaure', '**2')
-        text = text.replace('sine', 'sin').replace('cosine', 'cos').replace('tangent', 'tan')
-        text = text.replace('logarithm', 'log')
-        text = text.replace('exponential', 'exp')
-        text = text.replace('e power x', 'exp(x)').replace('e power', 'exp')
-        text = text.replace('power', '**').replace('raised to', '**')
-        text = text.replace('^', '**')
+        # Word numbers to digits
+        word_numbers = {
+            'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4',
+            'five': '5', 'six': '6', 'seven': '7', 'eight': '8', 'nine': '9',
+            'ten': '10', 'eleven': '11', 'twelve': '12', 'thirteen': '13',
+            'fourteen': '14', 'fifteen': '15', 'sixteen': '16', 'seventeen': '17',
+            'eighteen': '18', 'nineteen': '19', 'twenty': '20', 'thirty': '30',
+            'forty': '40', 'fifty': '50', 'sixty': '60', 'seventy': '70',
+            'eighty': '80', 'ninety': '90', 'hundred': '100', 'thousand': '1000',
+            'million': '1000000',
+        }
+        for word, digit in word_numbers.items():
+            text = re.sub(r'\b' + word + r'\b', digit, text)
 
-        text = ' '.join(text.split())
+        # 2. Specific constructs "X of Y and Z" or "Op X by Y"
+        # We use word boundaries to avoid partial matches (e.g., 'divide' matching 'divided')
+        constructs = {
+            "sum of": "+",
+            "addition of": "+",
+            "difference of": "-",
+            "subtraction of": "-",
+            "product of": "*",
+            "multiplication of": "*",
+            "division of": "/",
+            "multiply": "*",
+            "divide": "/",
+        }
+        for word, op in constructs.items():
+            pattern = r'\b' + word + r'\b'
+            if re.search(pattern, text):
+                text = re.sub(pattern, "", text)
+                if "and" in text:
+                    text = text.replace("and", op)
+                elif "by" in text:
+                    text = text.replace("by", op)
+
+        # Basic math symbols
+        replacements = {
+            "of": "",
+            "plus": "+",
+            "minus": "-",
+            "times": "*",
+            "multiplied by": "*",
+            "divided by": "/",
+            "over": "/",
+            "into": "*",
+            "equal to": "=",
+            "equals": "=",
+            "equal": "=",
+            "is": "=",
+            "square": "**2",
+            "squared": "**2",
+            "cube": "**3",
+            "cubed": "**3",
+            "square root of": "sqrt(",
+            "root of": "sqrt(",
+            "power": "**",
+            "raised to": "**",
+            "^": "**",
+            "sine": "sin",
+            "cosine": "cos",
+            "tangent": "tan",
+            "logarithm": "log",
+            "exponential": "exp",
+            "oneplus": "1+",
+            "and": "+", # Fallback for "1 and 2"
+        }
+        
+        # Sort replacements by length descending
+        sorted_keys = sorted(replacements.keys(), key=len, reverse=True)
+        
+        for word in sorted_keys:
+            if word in ["and"] and any(op in text for op in ["+", "-", "*", "/"]):
+                 continue # Skip fallback 'and' if we already have an operator
+            text = text.replace(word, replacements[word])
+
+        # Clean parentheses
+        if "sqrt(" in text and ")" not in text:
+            text += ")"
+
+        # Special: remove spaces around operators for cleaner parsing
+        text = re.sub(r'\s*(\*\*|\+|\-|\*|/|=)\s*', r'\1', text)
+        
+        # Collapse multiple spaces
+        text = re.sub(r'\s+', ' ', text)
+        
+        # Special for lists: convert '1, 2, 3' or '1 2 3' after '=' to space-separated values
+        # If there's an '=' and the RHS looks like a list
+        if "=" in text:
+            lhs, rhs = text.split("=", 1)
+            # If RHS contains commas between digits, keep them but normalize spaces
+            rhs = re.sub(r'(\d+)\s*,\s*(\d+)', r'\1,\2', rhs)
+            text = f"{lhs}={rhs}"
+
         return text.strip()
+
+    def parse_intent(self, text):
+        """Analyze voice text and return structured JSON with action + expression."""
+        clean_text = self.clean_voice_text(text)
+        action = "CALCULATE"
+        
+        lower_text = text.lower()
+        if "3d" in lower_text:
+            action = "PLOT_3D"
+        elif any(w in lower_text for w in ["plot", "graph", "draw"]):
+            action = "PLOT_2D"
+        elif any(w in lower_text for w in ["solve", "find x", "find the value"]):
+            action = "SOLVE"
+        elif any(w in lower_text for w in ["differentiate", "derivative", "derive"]):
+            action = "DERIVE"
+        elif any(w in lower_text for w in ["integrate", "integral"]):
+            action = "INTEGRATE"
+
+        # Special check for plot action: if 'y' is in expression, auto-detect 3D
+        if action == "PLOT_2D" and "y" in clean_text and "=" not in clean_text:
+             action = "PLOT_3D"
+
+        # Strip action keywords from the expressions
+        expr = clean_text
+        keywords = ["plot", "graph", "draw", "3d", "solve", "find x", "find the value of", 
+                    "differentiate", "derivative of", "derivative", "derive", 
+                    "integrate", "integral of", "integral", "calculate"]
+        for k in keywords:
+            cleaned_k = self.clean_voice_text(k)
+            # Remove from start of text primarily to avoid stripping math content
+            if expr.startswith(cleaned_k):
+                expr = expr[len(cleaned_k):].strip()
+            else:
+                expr = expr.replace(cleaned_k, "").strip()
+
+        # Handle implicit equations: x + y = 4 -> x + y - 4
+        # NEW: Handle multiple RHS values (levels)
+        levels = []
+        if "=" in expr and action not in ["SOLVE"]:
+            parts = expr.split("=")
+            if len(parts) == 2:
+                lhs = parts[0].strip()
+                rhs = parts[1].strip()
+                # Check for list in RHS: '4,5,6' or '4 5 6'
+                # Use split by comma or space if it looks like a list of numbers
+                val_strings = re.split(r'[,\s]+', rhs)
+                try:
+                    # Only treat as levels if all are numeric
+                    levels = [float(v) for v in val_strings if v.strip()]
+                    if len(levels) > 1:
+                        # Limit to 5 levels for performance
+                        levels = levels[:5]
+                        expr = lhs # The base function to plot against the levels
+                    elif len(levels) == 1:
+                        expr = f"({lhs})-({rhs})" # Standard implicit Eq
+                    else:
+                        expr = f"({lhs})-({rhs})"
+                except ValueError:
+                    # Not a numeric list, treat as normal implicit Eq
+                    expr = f"({lhs})-({rhs})"
+
+        # Identify variables
+        vars = []
+        if "x" in expr: vars.append("x")
+        if "y" in expr: vars.append("y")
+        if "z" in expr: vars.append("z")
+        
+        return {
+            "action": action,
+            "expression": expr,
+            "levels": levels,
+            "variables": vars if vars else ["x"]
+        }
+
+    def _clean_calculus_input(self, text):
+        """Refactored to use central cleaner."""
+        return self.clean_voice_text(text)
 
     # ========== RATE LIMITING ==========
     def check_rate_limit(self, max_requests=30, window_seconds=60):
@@ -163,24 +317,12 @@ class MathEngine:
     # ========== EQUATION SOLVING ==========
     def check_equation(self, text):
         """Handle equation solving commands like 'solve x squared minus 4 equals 0'."""
-        text = text.lower().strip()
-
+        text = self.clean_voice_text(text)
         if not any(w in text for w in ['solve', 'find x', 'find the value']):
             return None
 
-        # Remove trigger words
-        for w in ['solve', 'find the value of', 'find x for', 'find x in', 'find x']:
-            text = text.replace(w, '')
-
-        # NLP cleanup
-        text = text.replace('x squared', 'x**2').replace('x cubed', 'x**3')
-        text = text.replace('squared', '**2').replace('cubed', '**3')
-        text = text.replace('square', '**2').replace('cube', '**3')
-        text = text.replace('equals', '=').replace('equal to', '=').replace('equal', '=')
-        text = text.replace('minus', '-').replace('plus', '+')
-        text = text.replace('times', '*').replace('divided by', '/')
-        text = text.replace('^', '**')
-        text = text.strip()
+        intent = self.parse_intent(text)
+        text = intent['expression']
 
         try:
             x = sympy.symbols('x')
@@ -259,71 +401,10 @@ class MathEngine:
 
     # ========== EVALUATE (Math) ==========
     def evaluate(self, expression):
-        expression = expression.lower()
-
-        # 0. Convert word numbers to digits
-        word_numbers = {
-            'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4',
-            'five': '5', 'six': '6', 'seven': '7', 'eight': '8', 'nine': '9',
-            'ten': '10', 'eleven': '11', 'twelve': '12', 'thirteen': '13',
-            'fourteen': '14', 'fifteen': '15', 'sixteen': '16', 'seventeen': '17',
-            'eighteen': '18', 'nineteen': '19', 'twenty': '20', 'thirty': '30',
-            'forty': '40', 'fifty': '50', 'sixty': '60', 'seventy': '70',
-            'eighty': '80', 'ninety': '90', 'hundred': '100', 'thousand': '1000',
-            'million': '1000000',
-        }
-        for word, digit in word_numbers.items():
-            expression = re.sub(r'\b' + word + r'\b', digit, expression)
-
-        # 1. Handle specific natural language constructs
-        if 'subtraction of' in expression or 'difference of' in expression:
-            expression = expression.replace('subtraction of', '').replace('difference of', '')
-            expression = expression.replace('and', '-')
-
-        elif 'product of' in expression or 'multiplication of' in expression:
-            expression = expression.replace('product of', '').replace('multiplication of', '')
-            expression = expression.replace('and', '*')
-
-        elif 'division of' in expression:
-            expression = expression.replace('division of', '')
-            expression = expression.replace('by', '/').replace('and', '/')
-        elif 'divided by' in expression:
-            expression = expression.replace('divided by', '/')
-        elif 'divide' in expression and 'by' in expression:
-            expression = expression.replace('divide', '').replace('by', '/')
-
-        elif 'multiply' in expression and 'by' in expression:
-            expression = expression.replace('multiply', '').replace('by', '*')
-
-        elif 'addition of' in expression or 'sum of' in expression:
-            expression = expression.replace('addition of', '').replace('sum of', '')
-            expression = expression.replace('and', '+')
-
-        elif 'square root of' in expression or 'root of' in expression:
-            expression = expression.replace('square root of', 'sqrt(').replace('root of', 'sqrt(')
-            expression += ')'
-
-        # 2. General Replacements
-        nl_replacements = {
-            'oneplus': '1 +',
-            'minus': '-', 'multiply': '*', 'divide': '/',
-            'plus': '+', 'times': '*', 'into': '*', 'over': '/',
-            'power': '**', 'raised to': '**',
-            'squared': '**2', 'cubed': '**3',
-            'square': '**2', 'cube': '**3',
-            'logarithm': 'log', 'log': 'log', 'ln': 'ln',
-            'exponential': 'exp',
-        }
-
-        for word, symbol in nl_replacements.items():
-            expression = expression.replace(word, symbol)
-
-        # 3. Fallback "and" handling
-        if re.search(r'\d+\s+and\s+\d+', expression):
-            if not any(op in expression for op in ['-', '*', '/', '**']):
-                expression = expression.replace('and', '+')
-
-        expression = expression.strip()
+        expression = self.clean_voice_text(expression)
+        
+        if not expression:
+            return None
 
         # Division by zero check
         if re.search(r'/\s*0(\.0*)?\s*$', expression) or re.search(r'/\s*0(\.0*)?\s*[^.]', expression):
@@ -352,14 +433,15 @@ class MathEngine:
 
     # ========== CALCULUS ==========
     def check_calculus(self, text):
-        text = text.lower()
+        text_lower = text.lower()
 
         # 1. Differentiation
-        if any(w in text for w in ['differentiate', 'derivative', 'derive', 'differentiation']):
-            text = self._clean_calculus_input(text)
+        if any(w in text_lower for w in ['differentiate', 'derivative', 'derive', 'differentiation']):
+            intent = self.parse_intent(text)
+            expr_str = intent['expression']
             try:
                 x = sympy.symbols('x')
-                expr = self._parse_safe(text)
+                expr = self._parse_safe(expr_str)
                 if expr is None:
                     return None
                 result = sympy.diff(expr, x)
@@ -373,11 +455,12 @@ class MathEngine:
                 return None
 
         # 2. Integration
-        if any(w in text for w in ['integrate', 'integral', 'integration']):
-            text = self._clean_calculus_input(text)
+        if any(w in text_lower for w in ['integrate', 'integral', 'integration']):
+            intent = self.parse_intent(text)
+            expr_str = intent['expression']
             try:
                 x = sympy.symbols('x')
-                expr = self._parse_safe(text)
+                expr = self._parse_safe(expr_str)
                 if expr is None:
                     return None
                 result = sympy.integrate(expr, x)
@@ -397,29 +480,8 @@ class MathEngine:
         return text.lower().startswith(('plot', 'graph', 'draw'))
 
     def get_graph_function(self, text):
-        text = text.lower()
-        for word in ['plot', 'graph', 'draw', '3d']:
-            text = text.replace(word, '')
-
-        # Trig
-        text = text.replace('sine', 'sin').replace('cosine', 'cos').replace('tangent', 'tan')
-        # Powers
-        text = text.replace('x squared', 'x**2').replace('y squared', 'y**2')
-        text = text.replace('x cubed', 'x**3').replace('y cubed', 'y**3')
-        text = text.replace('squared', '**2').replace('cubed', '**3')
-        text = text.replace('square', '**2').replace('cube', '**3')
-        text = text.replace('sqaure', '**2')
-        # Operators
-        text = text.replace('plus', '+').replace('minus', '-')
-        text = text.replace('times', '*').replace('multiplied by', '*')
-        text = text.replace('divided by', '/').replace('over', '/')
-        # Functions
-        text = text.replace('logarithm', 'log')
-        text = text.replace('e power x', 'exp(x)').replace('e power', 'exp')
-        text = text.replace('exponential', 'exp')
-        text = text.replace('power', '**').replace('raised to', '**')
-        text = text.replace('^', '**')
-        return text.strip()
+        intent = self.parse_intent(text)
+        return intent['expression']
 
     def check_antigravity(self, text):
         keywords = ['activate antigravity', 'python fly', 'fly python']

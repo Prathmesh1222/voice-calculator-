@@ -11,6 +11,15 @@ const loader = document.getElementById('loader');
 const exportBtn = document.getElementById('exportBtn');
 const langSelect = document.getElementById('langSelect');
 
+// New Graphing Section Elements
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabPanes = document.querySelectorAll('.tab-pane');
+const modeBtns = document.querySelectorAll('.mode-btn');
+const activeGraphContainer = document.getElementById('activeGraphContainer');
+
+let activeTab = 'chat-pane';
+let activeGraphMode = '2D';
+
 // ===== Chat History =====
 let chatHistory = [];
 let welcomeRemoved = false;
@@ -149,14 +158,41 @@ function speak(text) {
     synth.speak(utterance);
 }
 
+// ===== Tab Switching =====
+tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        const targetTab = btn.getAttribute('data-tab');
+        activeTab = targetTab;
+
+        // Update UI
+        tabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        tabPanes.forEach(p => {
+            p.classList.toggle('active', p.id === targetTab);
+        });
+
+        statusBar.textContent = `Switched to ${btn.innerText}`;
+    });
+});
+
+// ===== Graph Mode Switching =====
+modeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        activeGraphMode = btn.getAttribute('data-mode');
+        modeBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        statusBar.textContent = `Graph Mode: ${activeGraphMode}`;
+    });
+});
+
 // ===== Microphone =====
 micBtn.addEventListener('click', () => {
     if (!recognition) {
-        addMessage("Speech recognition not supported in this browser.", 'bot');
+        addMessage("Speech recognition not supported.", 'bot');
         return;
     }
     if (!isListening) {
-        // Set language from dropdown
         recognition.lang = langSelect.value;
         try { recognition.start(); } catch (e) {}
     } else {
@@ -341,11 +377,22 @@ function hideLoader() { loader.style.display = 'none'; }
 
 async function sendToBackend(text) {
     showLoader();
+    
+    // Context-Aware Pre-processing for Graphing Tab
+    let processedText = text;
+    if (activeTab === 'graph-pane') {
+        const lower = text.toLowerCase();
+        if (!lower.includes('plot') && !lower.includes('graph') && !lower.includes('draw')) {
+            const prefix = activeGraphMode === '3D' ? '3d plot ' : 'plot ';
+            processedText = prefix + text;
+        }
+    }
+
     try {
         const response = await fetch('/process_command', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: text, lang: langSelect.value })
+            body: JSON.stringify({ text: processedText, lang: langSelect.value })
         });
         const data = await response.json();
         hideLoader();
@@ -353,7 +400,6 @@ async function sendToBackend(text) {
     } catch (error) {
         hideLoader();
         addMessage("Error connecting to server.", 'bot');
-        speak("Error connecting to server.");
         statusBar.textContent = "Error";
     }
 }
@@ -393,21 +439,34 @@ function handleResponse(data) {
         addMessage("🚀 Antigravity Activated!", 'bot');
         speak(data.speech);
         window.open('https://xkcd.com/353/', '_blank');
-        statusBar.textContent = "Ready";
         return;
     }
 
     if (data.graph) {
         const img = document.createElement('img');
         img.src = "data:image/png;base64," + data.graph;
-        graphContainer.innerHTML = '';
-        graphContainer.appendChild(img);
+        
+        // If in graphing mode or action is PLOT, update the main graph panel
+        if (activeTab === 'graph-pane' || data.action?.includes('PLOT')) {
+            activeGraphContainer.innerHTML = '';
+            activeGraphContainer.appendChild(img);
 
-        const dlBtn = document.createElement('button');
-        dlBtn.className = 'graph-download-btn';
-        dlBtn.innerHTML = '<i class="fas fa-download"></i> Download Graph';
-        dlBtn.onclick = () => { const a = document.createElement('a'); a.href = img.src; a.download = 'graph.png'; a.click(); };
-        graphContainer.appendChild(dlBtn);
+            const dlBtn = document.createElement('button');
+            dlBtn.className = 'graph-download-btn';
+            dlBtn.innerHTML = '<i class="fas fa-download"></i> Download Graph';
+            dlBtn.onclick = () => { const a = document.createElement('a'); a.href = img.src; a.download = 'graph.png'; a.click(); };
+            activeGraphContainer.appendChild(dlBtn);
+            
+            // Auto-switch to graphing tab if we were in chat
+            if (activeTab === 'chat-pane') {
+                const graphTabBtn = document.querySelector('[data-tab="graph-pane"]');
+                if (graphTabBtn) graphTabBtn.click();
+            }
+        } else {
+            // Original chat behavior fallback
+            graphContainer.innerHTML = '';
+            graphContainer.appendChild(img);
+        }
 
         if (data.result) addMessage(data.result, 'bot');
         speak(data.speech);
@@ -419,8 +478,9 @@ function handleResponse(data) {
         addMessage(data.result, 'bot');
         speak(data.speech);
     } else {
-        addMessage(data.speech || "I didn't understand that.", 'bot');
-        speak(data.speech);
+        const fallback = data.speech || "I didn't understand that.";
+        addMessage(fallback, 'bot');
+        speak(fallback);
     }
     statusBar.textContent = "Ready";
 }
