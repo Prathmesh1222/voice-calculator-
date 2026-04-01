@@ -137,7 +137,11 @@ def handle_graphing(intent, is_3d, response):
         pretty_func = math_engine.pretty_func_name(func_str)
         
         plt.close('all')
+        
         if is_3d:
+            # ==========================================
+            # 3D GRAPHING BLOCK
+            # ==========================================
             fig = plt.figure(figsize=(7, 5))
             ax = fig.add_subplot(111, projection='3d')
             
@@ -146,21 +150,15 @@ def handle_graphing(intent, is_3d, response):
             X, Y = np.meshgrid(x_vals, y_vals)
             
             if levels:
-                # Plot multiple layers of z = f(x,y) if z_sym not in variables
                 f_lambdified = sympy.lambdify((x_sym, y_sym), f, modules=['numpy'])
                 colors = plt.cm.viridis(np.linspace(0, 1, len(levels)))
                 for idx, level in enumerate(levels):
                     try:
-                        # If levels provided for f(x,y)=C, we plot z = f(x,y) - C ? No.
-                        # Usually user says z = x+y with levels 4,5,6 meaning z=4, z=5?
-                        # But user request says "x+y = 4,5,3". 
-                        # If it's 3D, we'll plot surfaces of z = x+y with target levels
                         Z = f_lambdified(X, Y) + level
                         if np.isscalar(Z): Z = np.full(X.shape, Z)
                         ax.plot_surface(X, Y, Z, color=colors[idx], alpha=0.5, label=f"Level {level}")
                     except Exception: continue
             else:
-                # Standard z = f(x,y)
                 f_lambdified = sympy.lambdify((x_sym, y_sym), f, modules=['numpy'])
                 try:
                     Z = f_lambdified(X, Y)
@@ -180,16 +178,24 @@ def handle_graphing(intent, is_3d, response):
             ax.set_xlabel('x-axis', fontsize=12, fontweight='600')
             ax.set_ylabel('y-axis', fontsize=12, fontweight='600')
             ax.set_zlabel('z-axis', fontsize=12, fontweight='600')
+            
+            # Subtler offset for tick labels
+            ax.tick_params(axis='both', which='major', labelsize=9, pad=5)
+
+        else:
+            # ==========================================
+            # 2D GRAPHING BLOCK
+            # ==========================================
+            fig = plt.figure(figsize=(7, 5))
+            ax = fig.add_subplot(111)
+            
             # Professional Aesthetics: Center Spines at (0,0)
-            ax = plt.gca()
             ax.spines['left'].set_position('zero')
             ax.spines['bottom'].set_position('zero')
             ax.spines['right'].set_color('none')
             ax.spines['top'].set_color('none')
             ax.xaxis.set_ticks_position('bottom')
             ax.yaxis.set_ticks_position('left')
-            
-            # Subtler offset for tick labels
             ax.tick_params(axis='both', which='major', labelsize=9, pad=5)
             
             if is_implicit:
@@ -242,6 +248,9 @@ def handle_graphing(intent, is_3d, response):
             plt.grid(True, linestyle='--', alpha=0.5, color='#cbd5e1')
             plt.tight_layout()
 
+        # ==========================================
+        # RENDER TO IMAGE
+        # ==========================================
         img = io.BytesIO()
         plt.savefig(img, format='png', bbox_inches='tight', dpi=100)
         img.seek(0)
